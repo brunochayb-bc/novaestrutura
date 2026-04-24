@@ -44,7 +44,7 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
   'Agro/Corp': '#ef4444',      // Red/Orange focus
 };
 
-type View = 'dashboard' | 'operational';
+type View = 'dashboard' | 'operational' | 'executivos' | 'organograma';
 
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
@@ -495,7 +495,7 @@ export default function App() {
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
         <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent">
-          Capacidade Operacional - Customer Success
+          Customer Success
         </h1>
       </header>
 
@@ -888,7 +888,9 @@ export default function App() {
           <nav className="space-y-2">
             {[
               { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-              { id: 'operational', label: 'Capacidade Operacional CS', icon: ShieldCheck },
+              { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
+              { id: 'executivos', label: 'Executivos Vendas', icon: Users },
+              { id: 'organograma', label: 'Organograma', icon: BarChart3 },
             ].map((item) => (
               <button
                 key={item.id}
@@ -932,7 +934,7 @@ export default function App() {
             >
               {renderDashboard()}
             </motion.div>
-          ) : (
+          ) : currentView === 'operational' ? (
             <motion.div 
               key="operational"
               initial={{ opacity: 0, x: 20 }}
@@ -941,6 +943,52 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
             >
               {renderOperational()}
+            </motion.div>
+          ) : currentView === 'executivos' ? (
+            <motion.div 
+              key="executivos"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+                <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+                  <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+                    Executivos Vendas
+                  </h1>
+                </header>
+                <div className="flex-1 bg-slate-900/40 border border-white/10 rounded-3xl p-8 flex items-center justify-center">
+                  <div className="text-center">
+                    <Users className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-slate-400 uppercase tracking-widest">Página em Desenvolvimento</h2>
+                    <p className="text-slate-500 mt-2">O detalhamento dos executivos será exibido aqui.</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="organograma"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+                <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+                  <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-rose-400 bg-clip-text text-transparent">
+                    Organograma
+                  </h1>
+                </header>
+                <div className="flex-1 bg-slate-900/40 border border-white/10 rounded-3xl p-8 flex items-center justify-center">
+                  <div className="text-center">
+                    <BarChart3 className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-slate-400 uppercase tracking-widest">Página em Desenvolvimento</h2>
+                    <p className="text-slate-500 mt-2">A estrutura organizacional será exibida aqui.</p>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
