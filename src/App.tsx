@@ -73,11 +73,25 @@ export default function App() {
 
   const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(() => {
     const saved = localStorage.getItem('opSettings');
-    return saved ? JSON.parse(saved) : initialOpSettings;
+    if (!saved) return initialOpSettings;
+    const parsed = JSON.parse(saved);
+    // Merge to ensure new fields are present
+    const merged = { ...initialOpSettings };
+    (Object.keys(parsed) as Vertical[]).forEach(v => {
+      merged[v] = { ...initialOpSettings[v], ...parsed[v] };
+    });
+    return merged;
   });
   const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(() => {
     const saved = localStorage.getItem('opParams');
-    return saved ? JSON.parse(saved) : initialParams;
+    if (!saved) return initialParams;
+    const parsed = JSON.parse(saved);
+    // Merge to ensure new fields are present
+    const merged = { ...initialParams };
+    (Object.keys(parsed) as Vertical[]).forEach(v => {
+      merged[v] = { ...initialParams[v], ...parsed[v] };
+    });
+    return merged;
   });
 
   // Persist to localStorage whenever state changes
@@ -743,29 +757,41 @@ export default function App() {
                       Carteira para atuação do time de CS
                     </h3>
                     <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { 
-                          label: 'Carteira Ativa p/ Visitação', 
-                          value: Math.round(stats.totalUsers * (1 - (opParams[v].percentNaoAcessiveis + opParams[v].percentRemotos) / 100) * opParams[v].visitasAno),
-                          sub: `Base x ${opParams[v].visitasAno}v/ano`,
-                          color: 'text-emerald-400',
-                          bg: 'bg-emerald-500/5'
-                        },
-                        { 
-                          label: 'Carteira Ativa p/ Remoto', 
-                          value: Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100) * opParams[v].contatosRemotosAno),
-                          sub: `Base x ${opParams[v].contatosRemotosAno}c/ano`,
-                          color: 'text-amber-400',
-                          bg: 'bg-amber-500/5'
-                        },
-                        { 
-                          label: 'Carteira em Desuso', 
-                          value: Math.round(stats.totalUsers * (opParams[v].percentDesuso / 100)),
-                          sub: 'Conforme % Desuso',
-                          color: 'text-rose-400',
-                          bg: 'bg-rose-500/5'
-                        }
-                      ].map((item, i) => (
+                      {(() => {
+                        const visitsAno = opParams[v]?.visitasAno || 0;
+                        const contatosAno = opParams[v]?.contatosRemotosAno || 0;
+                        const pNaoAcess = opParams[v]?.percentNaoAcessiveis || 0;
+                        const pRemotos = opParams[v]?.percentRemotos || 0;
+                        const pDesuso = opParams[v]?.percentDesuso || 0;
+
+                        const vVisits = Math.round(stats.totalUsers * Math.max(0, 1 - (pNaoAcess + pRemotos) / 100) * visitsAno);
+                        const vRemotes = Math.round(stats.totalUsers * (pRemotos / 100) * contatosAno);
+                        const vDesuso = Math.round(stats.totalUsers * (pDesuso / 100));
+
+                        return [
+                          { 
+                            label: 'Carteira Ativa p/ Visitação', 
+                            value: vVisits,
+                            sub: `Base x ${visitsAno}v/ano`,
+                            color: 'text-emerald-400',
+                            bg: 'bg-emerald-500/5'
+                          },
+                          { 
+                            label: 'Carteira Ativa p/ Remoto', 
+                            value: vRemotes,
+                            sub: `Base x ${contatosAno}c/ano`,
+                            color: 'text-amber-400',
+                            bg: 'bg-amber-500/5'
+                          },
+                          { 
+                            label: 'Carteira em Desuso', 
+                            value: vDesuso,
+                            sub: 'Conforme % Desuso',
+                            color: 'text-rose-400',
+                            bg: 'bg-rose-500/5'
+                          }
+                        ];
+                      })().map((item, i) => (
                         <div key={i} className={cn("p-4 rounded-2xl border border-white/5", item.bg)}>
                           <p className="text-[9px] font-black uppercase text-slate-500 mb-1 leading-tight h-5">{item.label}</p>
                           <p className={cn("text-xl font-black mb-0.5", item.color)}>{formatNumber(item.value)}</p>
@@ -776,11 +802,24 @@ export default function App() {
 
                     {/* Headcount Calculation */}
                     {(() => {
-                      const vVisits = Math.round(stats.totalUsers * (1 - (opParams[v].percentNaoAcessiveis + opParams[v].percentRemotos) / 100) * opParams[v].visitasAno);
-                      const vRemotes = Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100) * opParams[v].contatosRemotosAno);
-                      const vDesuso = Math.round(stats.totalUsers * (opParams[v].percentDesuso / 100));
+                      const visitsAno = opParams[v]?.visitasAno || 0;
+                      const contatosAno = opParams[v]?.contatosRemotosAno || 0;
+                      const pNaoAcess = opParams[v]?.percentNaoAcessiveis || 0;
+                      const pRemotos = opParams[v]?.percentRemotos || 0;
+                      const pDesuso = opParams[v]?.percentDesuso || 0;
+
+                      const baseVisits = Math.max(0, 1 - (pNaoAcess + pRemotos) / 100);
+                      const baseRemotes = pRemotos / 100;
+                      const baseDesuso = pDesuso / 100;
+
+                      const vVisits = Math.round(stats.totalUsers * baseVisits * visitsAno);
+                      const vRemotes = Math.round(stats.totalUsers * baseRemotes * contatosAno);
+                      const vDesuso = Math.round(stats.totalUsers * baseDesuso);
+                      
                       const totalDemand = vVisits + vRemotes + vDesuso;
-                      const capPerYear = (opSettings[v].visitasMes + opSettings[v].contatosMes) * 12;
+                      const capVisits = opSettings[v]?.capacidadeVisitasPresenciaisMes || 0;
+                      const capRemotes = opSettings[v]?.capacidadeContatosRemotosMes || 0;
+                      const capPerYear = (capVisits + capRemotes) * 12;
                       const hc = capPerYear > 0 ? (totalDemand / capPerYear).toFixed(1) : '0.0';
 
                       return (
