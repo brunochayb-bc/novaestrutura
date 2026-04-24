@@ -40,6 +40,8 @@ export interface VerticalOperationalParams {
   percentDesuso: number;
   percentRemotos: number;
   percentNaoAcessiveis: number;
+  capacidadeVisitasMes: number;
+  capacidadeRemotosMes: number;
 }
 
 export interface DashboardData {
