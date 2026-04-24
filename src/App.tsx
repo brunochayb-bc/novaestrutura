@@ -740,7 +740,7 @@ export default function App() {
                   <div className="mt-8 pt-6 border-t border-white/5 space-y-4">
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                       <BarChart3 className="w-4 h-4 mr-2 text-sky-400" />
-                      Detalhamento da Carteira Relevante
+                      Carteira para atuação do time de CS
                     </h3>
                     <div className="grid grid-cols-3 gap-4">
                       {[
@@ -773,6 +773,33 @@ export default function App() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Headcount Calculation */}
+                    {(() => {
+                      const vVisits = Math.round(stats.totalUsers * (1 - (opParams[v].percentNaoAcessiveis + opParams[v].percentRemotos) / 100) * opParams[v].visitasAno);
+                      const vRemotes = Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100) * opParams[v].contatosRemotosAno);
+                      const vDesuso = Math.round(stats.totalUsers * (opParams[v].percentDesuso / 100));
+                      const totalDemand = vVisits + vRemotes + vDesuso;
+                      const capPerYear = (opSettings[v].visitasMes + opSettings[v].contatosMes) * 12;
+                      const hc = capPerYear > 0 ? (totalDemand / capPerYear).toFixed(1) : '0.0';
+
+                      return (
+                        <div className="mt-6 p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest mb-1">Headcount CS Necessário</p>
+                            <p className="text-xs text-slate-400 font-medium">
+                              Calculado com base na demanda anual total vs. capacidade individual
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-3xl font-black text-emerald-400">
+                              {hc}
+                              <span className="text-xs ml-1 uppercase opacity-60">FTEs</span>
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
