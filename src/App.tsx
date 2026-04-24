@@ -746,15 +746,15 @@ export default function App() {
                       {[
                         { 
                           label: 'Carteira Ativa p/ Visitação', 
-                          value: Math.round(stats.totalUsers * (1 - opParams[v].percentNaoAcessiveis / 100)),
-                          sub: 'Total - Não Acessíveis',
+                          value: Math.round(stats.totalUsers * (1 - (opParams[v].percentNaoAcessiveis + opParams[v].percentRemotos) / 100) * opParams[v].visitasAno),
+                          sub: `Base x ${opParams[v].visitasAno}v/ano`,
                           color: 'text-emerald-400',
                           bg: 'bg-emerald-500/5'
                         },
                         { 
                           label: 'Carteira Ativa p/ Remoto', 
-                          value: Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100)),
-                          sub: 'Conforme % Remotos',
+                          value: Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100) * opParams[v].contatosRemotosAno),
+                          sub: `Base x ${opParams[v].contatosRemotosAno}c/ano`,
                           color: 'text-amber-400',
                           bg: 'bg-amber-500/5'
                         },
