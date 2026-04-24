@@ -448,8 +448,8 @@ export default function App() {
                     <td className="px-4 py-3">
                       <div className="flex items-center">
                         <span className={cn("mr-3 font-mono text-[10px] w-5 text-center", idx < 3 ? "text-amber-400 font-black" : "text-slate-600")}>{(idx + 1).toString().padStart(2, '0')}</span>
-                        <div className="flex flex-col">
-                          <span className="text-slate-100 font-bold group-hover:text-white truncate max-w-[120px]">{client.name}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-slate-100 font-bold group-hover:text-white truncate max-w-[180px]" title={client.name}>{client.name}</span>
                           <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">{client.vertical}</span>
                         </div>
                       </div>

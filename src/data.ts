@@ -245,6 +245,40 @@ function parseData() {
       };
     });
 
+  // Aggregation Logic
+  const aggregationMap: Record<string, string> = {
+    "BANCO DO BRASIL": "BANCO DO BRASIL",
+    "BB ASSET MANAGEMENT": "BANCO DO BRASIL",
+    "ITAU UNIBANCO": "ITAU UNIBANCO",
+    "ITAU UNIBANCO SA": "ITAU UNIBANCO",
+    "CAIXA DTVM": "CAIXA",
+    "CN CONTRATACOES - CECOT/BR": "CAIXA",
+    "CAIXA ECONOMICA FEDERAL CEF": "CAIXA"
+  };
+
+  const aggregated: Record<string, Customer> = {};
+  const result: Customer[] = [];
+
+  baseCustomers.forEach(c => {
+    const targetName = aggregationMap[c.name.toUpperCase()];
+    if (targetName) {
+      if (!aggregated[targetName]) {
+        aggregated[targetName] = { ...c, name: targetName };
+      } else {
+        aggregated[targetName].users += c.users;
+        aggregated[targetName].revenue += c.revenue;
+        aggregated[targetName].fatAe += c.fatAe;
+        aggregated[targetName].fatAeUs += c.fatAeUs;
+        aggregated[targetName].fatBols += c.fatBols;
+        aggregated[targetName].fatBolUs += c.fatBolUs;
+      }
+    } else {
+      result.push(c);
+    }
+  });
+
+  const aggregatedCustomers: Customer[] = [...result, ...Object.values(aggregated)];
+
   const targets = {
     'Financeiro I': { clients: 48, revenue: 4600000, users: 4930 },
     'Governo': { clients: 109, revenue: 3900000, users: 1990 },
@@ -256,7 +290,7 @@ function parseData() {
 
   (Object.keys(targets) as Vertical[]).forEach(v => {
     const vTarget = targets[v];
-    const realVCustomers = baseCustomers.filter(c => c.vertical === v);
+    const realVCustomers = aggregatedCustomers.filter(c => c.vertical === v);
     
     finalCustomers.push(...realVCustomers);
     
