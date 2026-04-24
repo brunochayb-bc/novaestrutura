@@ -17,7 +17,9 @@ import {
   Calendar,
   Phone,
   ArrowRight,
-  Info
+  Info,
+  Menu,
+  ChevronLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -44,34 +46,11 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
 
 type View = 'dashboard' | 'operational';
 
-const EFFORT_LABELS: Record<number, string> = {
-  25: 'Baixo',
-  50: 'Médio',
-  75: 'Alto',
-  100: 'Muito Alto'
-};
-
-const getRecommendedProfile = (settings: OperationalSettings) => {
-  const { suporteTreinamento, relacionamento, gestaoContratual } = settings;
-  
-  // Rule for Senior: Gestao Contratual is High or Very High, OR (Relacionamento is High/Very High AND Gestao Contratual is at least Mid)
-  if (gestaoContratual >= 75 || (relacionamento >= 75 && gestaoContratual >= 50)) {
-    return { title: 'Customer Success Sênior', description: 'Perfil estratégico focado em grandes contas, negociações complexas e visão de longo prazo.' };
-  }
-  
-  // Rule for Pleno: Gestao Contratual is Mid, OR Relacionamento is at least Mid, OR Suporte/Treinamento is Very High
-  if (gestaoContratual >= 50 || relacionamento >= 50 || suporteTreinamento === 100) {
-    return { title: 'Customer Success Pleno', description: 'Perfil analítico focado em engajamento, retenção e suporte especializado de alta complexidade.' };
-  }
-  
-  // Otherwise, Junior
-  return { title: 'Customer Success Júnior', description: 'Perfil operacional focado em suporte técnico, treinamentos e rotinas de atendimento.' };
-};
-
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [selectedVertical, setSelectedVertical] = useState<Vertical | 'Tudo'>('Tudo');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ 
     key: 'totalRevenue', 
     direction: 'desc' 
@@ -79,33 +58,40 @@ export default function App() {
 
   // Operational Settings State
   const initialOpSettings: Record<Vertical, OperationalSettings> = {
-    'Financeiro I': { suporteTreinamento: 25, relacionamento: 50, gestaoContratual: 25 },
-    'Financeiro II': { suporteTreinamento: 25, relacionamento: 50, gestaoContratual: 25 },
-    'Governo': { suporteTreinamento: 25, relacionamento: 50, gestaoContratual: 25 },
-    'Agro/Corp': { suporteTreinamento: 25, relacionamento: 50, gestaoContratual: 25 },
+    'Financeiro I': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 40 },
+    'Financeiro II': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 2, capacidadeContatosRemotosMes: 60 },
+    'Governo': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 6, capacidadeContatosRemotosMes: 20 },
+    'Agro/Corp': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 50 },
   };
 
   const initialParams: Record<Vertical, VerticalOperationalParams> = {
-    'Financeiro I': { visitasAno: 1, contatosRemotosAno: 1.5, percentDesuso: 15, percentRemotos: 60, percentNaoAcessiveis: 5, capacidadeVisitasMes: 15, capacidadeRemotosMes: 100 },
-    'Financeiro II': { visitasAno: 1, contatosRemotosAno: 2, percentDesuso: 20, percentRemotos: 70, percentNaoAcessiveis: 10, capacidadeVisitasMes: 15, capacidadeRemotosMes: 120 },
-    'Governo': { visitasAno: 1.5, contatosRemotosAno: 1, percentDesuso: 10, percentRemotos: 30, percentNaoAcessiveis: 20, capacidadeVisitasMes: 10, capacidadeRemotosMes: 80 },
-    'Agro/Corp': { visitasAno: 1, contatosRemotosAno: 2, percentDesuso: 25, percentRemotos: 80, percentNaoAcessiveis: 15, capacidadeVisitasMes: 20, capacidadeRemotosMes: 150 },
+    'Financeiro I': { visitasAno: 1, contatosRemotosAno: 1, percentDesuso: 15, percentRemotos: 60, percentNaoAcessiveis: 5 },
+    'Financeiro II': { visitasAno: 0.5, contatosRemotosAno: 2, percentDesuso: 20, percentRemotos: 70, percentNaoAcessiveis: 10 },
+    'Governo': { visitasAno: 1.5, contatosRemotosAno: 0.4, percentDesuso: 10, percentRemotos: 30, percentNaoAcessiveis: 20 },
+    'Agro/Corp': { visitasAno: 1, contatosRemotosAno: 1.5, percentDesuso: 25, percentRemotos: 80, percentNaoAcessiveis: 15 },
   };
 
   const [opSettings, setOpSettings] = useState(initialOpSettings);
   const [opParams, setOpParams] = useState(initialParams);
-  const [saveStatus, setSaveStatus] = useState<Record<Vertical, boolean>>({
-    'Financeiro I': false,
+  const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
+    'Financeiro I': true,
     'Financeiro II': false,
     'Governo': false,
     'Agro/Corp': false,
   });
+  const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
 
-  const handleSaveVertical = (vertical: Vertical) => {
-    setSaveStatus(prev => ({ ...prev, [vertical]: true }));
-    setTimeout(() => {
-      setSaveStatus(prev => ({ ...prev, [vertical]: false }));
-    }, 2000);
+  const toggleVertical = (v: Vertical) => {
+    setExpandedVerticals(prev => ({ ...prev, [v]: !prev[v] }));
+  };
+
+  const handleSave = (vertical: Vertical) => {
+    setUnsavedVerticals(prev => {
+      const next = new Set(prev);
+      next.delete(vertical);
+      return next;
+    });
+    // Here logic to save to a database would be implemented
   };
 
   const requestSort = (key: string) => {
@@ -150,92 +136,160 @@ export default function App() {
     participation: v.revenueParticipation
   })).sort((a, b) => b.revenue - a.revenue), [data]);
 
-  const updateOpSetting = (vertical: Vertical, field: keyof OperationalSettings, rawValue: number) => {
-    // Snap to 25, 50, 75, 100
-    const snaps = [25, 50, 75, 100];
-    const value = snaps.reduce((prev, curr) => Math.abs(curr - rawValue) < Math.abs(prev - rawValue) ? curr : prev);
+  const totals = useMemo(() => {
+    if (selectedVertical === 'Tudo') {
+      const clients = data.verticals.reduce((sum, v) => sum + v.totalClients, 0);
+      const users = data.verticals.reduce((sum, v) => sum + v.totalUsers, 0);
+      const revenue = data.verticals.reduce((sum, v) => sum + v.totalRevenue, 0);
+      return {
+        totalClients: clients,
+        totalUsers: users,
+        totalRevenue: revenue,
+        averageTicket: clients > 0 ? revenue / clients : 0,
+        usersPerClient: clients > 0 ? users / clients : 0
+      };
+    } else {
+      const v = data.verticals.find(vs => vs.vertical === selectedVertical);
+      return {
+        totalClients: v?.totalClients || 0,
+        totalUsers: v?.totalUsers || 0,
+        totalRevenue: v?.totalRevenue || 0,
+        averageTicket: v?.averageTicket || 0,
+        usersPerClient: v?.usersPerClient || 0
+      };
+    }
+  }, [data, selectedVertical]);
 
+  const updateOpSetting = (vertical: Vertical, field: keyof OperationalSettings, value: number) => {
+    setUnsavedVerticals(prev => new Set(prev).add(vertical));
     setOpSettings(prev => ({
       ...prev,
-      [vertical]: { ...prev[vertical], [field]: value }
+      [vertical]: {
+        ...prev[vertical],
+        [field]: value
+      }
     }));
   };
 
+  const effortLevelLabels = ["Baixo", "Médio", "Alto", "Muito Alto"];
+
+  const getRecommendedProfile = (settings: OperationalSettings): string => {
+    const { suporteTreinamento: st, relacionamento: rel, gestaoContratual: gc } = settings;
+    
+    // Logic based on the provided table:
+    // Senior: High REL and GC, or very high GC
+    if (gc >= 3) return 'Sênior';
+    if (gc === 2) {
+      if (st >= 2 && rel === 0) return 'Pleno'; // Row 30: A, B, A -> Pleno
+      return 'Sênior'; 
+    }
+    if (rel >= 2) {
+      if (rel === 3 && gc <= 1) return 'Pleno'; // Rows 14, 15, 24, 25: REL=MA, GC=B or M -> Pleno
+      return 'Sênior';
+    }
+    
+    // Pleno: Middle ground
+    if (rel >= 1 || gc >= 1) return 'Pleno';
+    
+    // Junior: Low REL and GC
+    return 'Júnior';
+  };
+
   const updateOpParam = (vertical: Vertical, field: keyof VerticalOperationalParams, value: number) => {
+    setUnsavedVerticals(prev => new Set(prev).add(vertical));
     setOpParams(prev => ({
       ...prev,
       [vertical]: { ...prev[vertical], [field]: value }
     }));
   };
 
-  const renderExecutiveDashboard = () => (
-    <div className="flex flex-col flex-1 space-y-6 min-h-0">
-      <header className="flex justify-between items-center bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl">
+  const renderDashboard = () => (
+    <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+      {/* Header */}
+      <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter text-white mb-1">Visão Analítica Global</h1>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-[0.15em] flex items-center">
-            <Info className="w-4 h-4 mr-2 text-sky-400" />
-            Portfólio Consolidado • Q2 2026
-          </p>
+          <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+            Visão Geral Clientes
+          </h1>
         </div>
-        <div className="flex space-x-1.5 bg-slate-950 p-1 rounded-2xl border border-white/5 shadow-inner">
-          {(['Tudo', ...Object.keys(VERTICAL_COLORS)] as any).map((v: any) => (
-            <button
-              key={v}
-              onClick={() => setSelectedVertical(v)}
-              className={cn(
-                "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                selectedVertical === v 
-                  ? "bg-sky-500 text-white shadow-lg shadow-sky-500/20" 
-                  : "text-slate-500 hover:text-slate-300"
-              )}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex items-center space-x-4">
+          <div className="flex bg-slate-950/50 p-1 rounded-xl border border-white/5">
+            {['Tudo', 'Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp'].map((v) => (
+              <button
+                key={v}
+                onClick={() => setSelectedVertical(v as any)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap",
+                  selectedVertical === v 
+                    ? "bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.1)]" 
+                    : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-4 shrink-0">
+      {/* Stats Grid - High Contrast */}
+      <div className="grid grid-cols-4 gap-4 h-24 shrink-0">
         {[
-          { icon: Users, label: 'Clientes Ativos', value: formatNumber(data.totalClients), color: 'text-sky-400' },
-          { icon: Monitor, label: 'Usuários Totais', value: formatNumber(data.totalUsers), color: 'text-indigo-400' },
-          { icon: DollarSign, label: 'Revenue (MRR)', value: formatCurrency(data.totalRevenue), color: 'text-emerald-400' },
-          { icon: Target, label: 'Ticket Médio', value: formatCurrency(data.averageTicket), color: 'text-amber-400' },
-        ].map((item, i) => (
-          <div key={i} className="bg-slate-900 border border-white/5 rounded-2xl p-4 flex flex-col shadow-xl transition-transform hover:scale-[1.01]">
-            <div className="flex justify-between items-start mb-3">
-              <div className={cn("p-2 rounded-lg bg-slate-950 border border-white/10", item.color)}>
-                <item.icon className="w-4 h-4" />
-              </div>
+          { label: 'Total de Clientes', value: formatNumber(totals.totalClients), icon: Users, sub: selectedVertical === 'Tudo' ? `${data.verticals.length} Verticais` : 'Vertical Selecionada', color: 'bg-indigo-500' },
+          { label: 'Total de usuários', value: formatNumber(totals.totalUsers), icon: Monitor, sub: `${(totals.totalUsers / totals.totalClients || 0).toFixed(1)} usuários/cliente`, color: 'bg-emerald-500' },
+          { label: 'Total', value: formatCurrency(totals.totalRevenue), icon: DollarSign, sub: 'Faturamento Mensal', accent: true, color: 'bg-sky-500' },
+          { label: 'ticket médio/cliente', value: formatCurrency(totals.averageTicket), icon: Target, color: 'bg-amber-500' },
+        ].map((stat, i) => (
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.05 }}
+            className={cn(
+              "bg-slate-950 border-2 border-white/10 rounded-2xl p-3 flex flex-col justify-center relative overflow-hidden group shadow-[0_8px_30px_rgb(0,0,0,0.4)]",
+              stat.accent && "border-sky-500/50 ring-1 ring-sky-500/20"
+            )}
+          >
+            <div className={cn("absolute right-0 top-0 w-1.5 h-full opacity-80", stat.color)} />
+            <stat.icon className="absolute right-4 top-4 w-10 h-10 text-white/[0.05] group-hover:text-white/[0.1] transition-all group-hover:rotate-12" />
+            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">{stat.label}</p>
+            <div className="flex items-baseline space-x-2">
+              <p className="text-2xl font-black text-white tracking-tight drop-shadow-sm">{stat.value}</p>
             </div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5">{item.label}</p>
-            <p className="text-xl font-black text-white tracking-tighter">{item.value}</p>
-          </div>
+            {stat.sub && (
+              <p className="text-[8px] text-slate-500 font-bold mt-1 inline-flex items-center">
+                <span className={cn("w-1 h-1 rounded-full mr-2", stat.color)} />
+                {stat.sub}
+              </p>
+            )}
+          </motion.div>
         ))}
       </div>
 
       <div className="grid grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+        {/* Charts Section */}
         <div className="col-span-8 flex flex-col space-y-4 min-h-0">
           <div className="grid grid-cols-2 gap-4 h-[40%] shrink-0">
-            <div className="bg-slate-900 border border-white/5 rounded-2xl p-5 flex flex-col shadow-xl">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center">
-                <BarChart3 className="w-3.5 h-3.5 mr-2 text-sky-400" />
-                Faturamento por Vertical
+            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
+                <BarChart3 className="w-3.5 h-3.5 mr-2 text-sky-500" />
+                Receita por Vertical
               </h3>
-              <div className="flex-1">
+              <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 20 }}>
+                  <BarChart data={barData} layout="vertical" margin={{ left: -30, right: 10 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" hide />
+                    <YAxis type="category" dataKey="name" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} width={100} />
                     <Tooltip 
-                      cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                      contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', padding: '8px' }}
-                      itemStyle={{ color: '#fff', fontSize: '10px', fontWeight: 'bold' }}
+                      cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
+                      formatter={(val: number) => [formatCurrency(val), 'MRR Total']}
                     />
-                    <Bar dataKey="revenue" radius={[0, 4, 4, 0]} barSize={16}>
+                    <Bar dataKey="revenue" radius={[0, 6, 6, 0]} barSize={20}>
                       {barData.map((entry, index) => (
-                        <Cell key={index} fill={VERTICAL_COLORS[entry.name as Vertical]} />
+                        <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -243,112 +297,164 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-white/5 rounded-2xl p-5 flex flex-col shadow-xl">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center">
-                <PieIcon className="w-3.5 h-3.5 mr-2 text-indigo-400" />
-                Distribuição de Receita
+            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
+                <PieIcon className="w-3.5 h-3.5 mr-2 text-indigo-500" />
+                Participação de Mercado
               </h3>
-              <div className="flex-1 flex items-center justify-center">
-                <PieChart width={160} height={160}>
-                  <Pie
-                    data={barData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={65}
-                    paddingAngle={6}
-                    dataKey="revenue"
-                    stroke="none"
-                  >
-                    {barData.map((entry, index) => (
-                      <Cell key={index} fill={VERTICAL_COLORS[entry.name as Vertical]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', padding: '8px' }}
-                    itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#fff' }}
-                    formatter={(value: number, name: string) => [
-                      `${((value / data.totalRevenue) * 100).toFixed(1)}%`,
-                      name
-                    ]}
-                  />
-                </PieChart>
+              <div className="flex-1 flex items-center min-h-0">
+                <div className="w-[45%] h-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={barData}
+                        dataKey="revenue"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="60%"
+                        outerRadius="90%"
+                        paddingAngle={5}
+                      >
+                        {barData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(255,255,255,0.1)" />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                        itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                        formatter={(value: number, name: string) => [
+                          `${((value / data.totalRevenue) * 100).toFixed(1)}%`,
+                          name
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 pl-4 space-y-2">
+                  {barData.map((v) => (
+                    <div key={v.name} className="flex items-center justify-between">
+                      <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase">
+                        <div className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: v.fill }} />
+                        {v.name}
+                      </div>
+                      <span className="text-xs font-black text-white">{v.participation.toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 bg-slate-900 border border-white/5 rounded-2xl p-5 flex flex-col min-h-0 shadow-xl overflow-hidden">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center">
-              <TrendingUp className="w-3.5 h-3.5 mr-2 text-emerald-400" />
-              Performance Comparativa
+          <div className="flex-1 bg-slate-900/60 border border-white/10 rounded-2xl p-5 flex flex-col min-h-0 shadow-inner overflow-hidden">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
+              <TrendingUp className="w-3.5 h-3.5 mr-2 text-emerald-500" />
+              Visão Detalhada por Vertical
             </h3>
             <div className="flex-1 overflow-auto custom-scrollbar">
-              <table className="w-full text-[11px] text-left border-separate border-spacing-y-1.5">
-                <thead className="text-slate-500 font-black uppercase text-[9px] tracking-widest sticky top-0 bg-slate-900 z-20">
+              <table className="w-full text-xs text-left border-separate border-spacing-y-1">
+                <thead className="text-slate-500 font-bold uppercase text-[9px] tracking-widest sticky top-0 bg-slate-900/90 backdrop-blur z-20">
                   <tr>
-                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('vertical')}>Vertical</th>
-                    <th className="px-4 py-2">Clientes</th>
-                    <th className="px-4 py-2">Usuários</th>
-                    <th className="px-4 py-2">Faturamento</th>
-                    <th className="px-4 py-2 text-right">U/C</th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('vertical')}>
+                      <div className="flex items-center">Vertical {sortConfig.key === 'vertical' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalClients')}>
+                      <div className="flex items-center">Clientes {sortConfig.key === 'totalClients' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalUsers')}>
+                      <div className="flex items-center">Usuários {sortConfig.key === 'totalUsers' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalRevenue')}>
+                      <div className="flex items-center">Faturamento {sortConfig.key === 'totalRevenue' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('averageTicket')}>
+                      <div className="flex items-center">Ticket Médio {sortConfig.key === 'averageTicket' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
+                    <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors text-right" onClick={() => requestSort('usersPerClient')}>
+                      <div className="flex items-center justify-end">Usuários/Cli {sortConfig.key === 'usersPerClient' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.02]">
+                <tbody className="divide-y-0">
                   {sortedVerticals.map((v: any) => (
-                    <tr key={v.vertical} className="group hover:bg-white/[0.02] transition-all rounded-xl">
-                      <td className="px-4 py-3 first:rounded-l-xl">
-                        <div className="flex items-center font-bold text-white whitespace-nowrap text-xs">
-                          <div className="w-2 h-2 rounded-full mr-2.5" style={{ backgroundColor: VERTICAL_COLORS[v.vertical as Vertical] }} />
+                    <tr 
+                      key={v.vertical} 
+                      onClick={() => setSelectedVertical(v.vertical)}
+                      className={cn(
+                        "group cursor-pointer transition-all rounded-xl",
+                        selectedVertical === v.vertical ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-950/20 hover:bg-slate-950/50"
+                      )}
+                    >
+                      <td className="px-4 py-3 first:rounded-l-xl border-y border-l border-white/5 group-hover:border-white/10">
+                        <div className="flex items-center font-black text-white whitespace-nowrap">
+                          <div className="w-2 h-2 rounded-full mr-3" style={{ backgroundColor: VERTICAL_COLORS[v.vertical as Vertical] }} />
                           {v.vertical}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-[10px] font-medium">{formatNumber(v.totalClients)}</td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-[10px] font-medium">{formatNumber(v.totalUsers)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col min-w-[100px]">
-                          <span className="font-mono text-sky-400 font-bold whitespace-nowrap text-[10px]">{formatCurrency(v.totalRevenue)}</span>
-                          <div className="h-1 bg-slate-950 rounded-full mt-1.5 overflow-hidden shadow-inner">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${(v.totalRevenue / maxRevenue) * 100}%` }} className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.3)]" />
+                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalClients)}</td>
+                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalUsers)}</td>
+                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
+                        <div className="flex flex-col min-w-[120px]">
+                          <span className="font-mono text-sky-400 font-bold whitespace-nowrap">{formatCurrency(v.totalRevenue)}</span>
+                          <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${(v.totalRevenue / maxRevenue) * 100}%` }} className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 last:rounded-r-xl text-right">
-                        <span className="text-emerald-400 font-bold font-mono text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">{v.usersPerClient.toFixed(1)}</span>
+                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
+                        <div className="flex flex-col min-w-[100px]">
+                          <span className="text-slate-300 font-semibold font-mono text-[11px] whitespace-nowrap">{formatCurrency(v.averageTicket)}</span>
+                          <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${(v.averageTicket / maxTicket) * 100}%` }} className="h-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 last:rounded-r-xl border-y border-r border-white/5 group-hover:border-white/10 text-right">
+                        <span className="text-emerald-400 font-bold font-mono text-[11px]">{v.usersPerClient.toFixed(1)}</span>
                       </td>
                     </tr>
                   ))}
+                  <tr className="bg-sky-500/10 border-t border-sky-500/20">
+                    <td className="px-4 py-4 rounded-l-xl border-y border-l border-sky-500/20 font-black text-sky-400 uppercase tracking-wider">Total</td>
+                    <td className="px-4 py-4 border-y border-sky-500/20 text-white font-mono font-bold">{formatNumber(totals.totalClients)}</td>
+                    <td className="px-4 py-4 border-y border-sky-500/20 text-white font-mono font-bold">{formatNumber(totals.totalUsers)}</td>
+                    <td className="px-4 py-4 border-y border-sky-500/20 text-white font-mono font-bold">{formatCurrency(totals.totalRevenue)}</td>
+                    <td className="px-4 py-4 border-y border-sky-500/20 text-white font-mono font-bold">{formatCurrency(totals.averageTicket)}</td>
+                    <td className="px-4 py-4 rounded-r-xl border-y border-r border-sky-500/20 text-right text-white font-mono font-bold">{totals.usersPerClient.toFixed(1)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <div className="col-span-4 flex flex-col min-h-0 bg-slate-900 border border-white/5 rounded-2xl shadow-xl overflow-hidden relative">
-          <div className="p-5 border-b border-white/5 bg-slate-950/20">
-            <h3 className="text-xs font-black text-white flex items-center uppercase tracking-wider">Top 20 Institucional</h3>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Ranking por Receita Direta</p>
+        {/* Top 20 Section */}
+        <div className="col-span-4 flex flex-col min-h-0 bg-slate-900/80 border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500" />
+          <div className="p-5 border-b border-white/5 flex flex-col space-y-2 bg-slate-950/20">
+            <h3 className="text-sm font-black text-white flex items-center uppercase tracking-wider">Top 20 Clientes {selectedVertical !== 'Tudo' ? `- ${selectedVertical}` : ''}</h3>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Ordenado por Volume (MRR)</p>
           </div>
           <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full text-[10px] text-left border-collapse">
-              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur z-10 border-b border-white/5">
-                <tr className="text-slate-500">
-                  <th className="px-5 py-3 font-black uppercase text-[8px] tracking-widest whitespace-nowrap">Inst.</th>
-                  <th className="px-5 py-3 font-black uppercase text-[8px] tracking-widest text-right whitespace-nowrap">Volume (MRR)</th>
+            <table className="w-full text-[11px] text-left border-collapse">
+              <thead className="bg-[#0f172a]/95 backdrop-blur-md sticky top-0 z-20">
+                <tr className="text-slate-500 font-black uppercase text-[9px] tracking-widest border-b border-white/5">
+                  <th className="px-4 py-3">Ranking / Nome</th>
+                  <th className="px-4 py-3 text-right">Faturamento</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {topClients.map((client, idx) => (
-                  <tr key={idx} className="hover:bg-white/[0.02] group transition-colors">
-                    <td className="px-5 py-3">
+                  <tr key={idx} className="hover:bg-sky-500/5 group transition-colors">
+                    <td className="px-4 py-3">
                       <div className="flex items-center">
-                        <span className={cn("mr-3 font-mono text-[9px] w-5 text-center py-0.5 rounded", idx < 3 ? "bg-amber-500/10 text-amber-400 font-black border border-amber-500/20" : "text-slate-600")}>{(idx + 1)}</span>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-slate-200 font-bold group-hover:text-white truncate max-w-[120px]">{client.name}</span>
-                          <span className="text-[7px] text-slate-500 font-black uppercase tracking-tight mt-0.5">{client.vertical}</span>
+                        <span className={cn("mr-3 font-mono text-[10px] w-5 text-center", idx < 3 ? "text-amber-400 font-black" : "text-slate-600")}>{(idx + 1).toString().padStart(2, '0')}</span>
+                        <div className="flex flex-col">
+                          <span className="text-slate-100 font-bold group-hover:text-white truncate max-w-[120px]">{client.name}</span>
+                          <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">{client.vertical}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-right"><span className="font-mono text-sky-400 font-black tracking-tighter text-[11px]">{formatCurrency(client.revenue)}</span></td>
+                    <td className="px-4 py-3 text-right"><span className="font-mono text-sky-400 font-bold">{formatCurrency(client.revenue)}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -359,334 +465,355 @@ export default function App() {
     </div>
   );
 
-  const renderExecutiveOperational = () => (
-    <div className="flex flex-col flex-1 space-y-6 min-h-0">
-      <header className="flex justify-between items-center bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl">
-        <div>
-          <h1 className="text-3xl font-black uppercase tracking-tighter text-white">
-            Dimensionamento CS
-          </h1>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Gestão de Headcount • Planejamento Operacional</p>
-        </div>
-        <div className="flex items-center space-x-3 bg-slate-950 p-2 rounded-2xl border border-white/5 shadow-inner">
-           <Info className="w-4 h-4 text-slate-600 ml-2" />
-           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4">Calibração Ativa</span>
-        </div>
+  const renderOperational = () => (
+    <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+      <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+        <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent">
+          Capacidade Operacional - Customer Success
+        </h1>
       </header>
 
-      <div className="flex-1 overflow-auto custom-scrollbar space-y-8 pb-10">
+      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
         {(Object.keys(opSettings) as Vertical[]).map((v) => {
           const stats = data.verticals.find(vs => vs.vertical === v);
-                  const userCountNonAccessible = Math.round((stats.totalUsers * opParams[v].percentNaoAcessiveis) / 100);
-          const activePortfolio = stats.totalUsers - userCountNonAccessible;
-          const userCountRemotos = Math.round((stats.totalUsers * opParams[v].percentRemotos) / 100);
-          const userCountInDesuso = Math.round((stats.totalUsers * opParams[v].percentDesuso) / 100);
-          
-          const usersForVisitas = Math.max(0, activePortfolio - userCountRemotos);
-          const totalVisitasNecessarias = usersForVisitas * opParams[v].visitasAno;
-          const totalRemotosNecessarios = userCountRemotos * opParams[v].contatosRemotosAno;
+          if (!stats) return null;
 
-          // Headcount FTE = (Totais / (Capacidade Mes * 12))
-          const fteVisitas = totalVisitasNecessarias / (opParams[v].capacidadeVisitasMes * 12);
-          const fteRemotos = totalRemotosNecessarios / (opParams[v].capacidadeRemotosMes * 12);
-          const headcountEstimado = (fteVisitas + fteRemotos).toFixed(1);
+          const totalAllocation = opSettings[v].suporteTreinamento + opSettings[v].relacionamento + opSettings[v].gestaoContratual;
 
           return (
             <motion.div 
               key={v}
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-900 border border-white/5 rounded-2xl overflow-hidden shadow-2xl relative"
+              className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden shadow-2xl"
             >
-              <div className="bg-slate-950/50 px-8 py-5 border-b border-white/5 flex justify-between items-center">
+              <div 
+                className="bg-slate-950/50 px-8 py-5 border-b border-white/5 flex justify-between items-center cursor-pointer hover:bg-slate-950/70 transition-colors"
+                onClick={() => toggleVertical(v)}
+              >
                 <div className="flex items-center space-x-4">
-                  <div className="w-3 h-3 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: VERTICAL_COLORS[v], color: VERTICAL_COLORS[v] }} />
-                  <h2 className="text-xl font-black tracking-tighter text-white uppercase">{v}</h2>
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: VERTICAL_COLORS[v] }} />
+                  <h2 className="text-xl font-bold tracking-tight text-white uppercase">{v}</h2>
                 </div>
-                <div className="flex items-center space-x-4">
-                   <div className="flex items-center space-x-4 px-6 py-2 bg-slate-900/50 border border-white/5 rounded-xl shadow-inner">
-                      <div className="text-center">
-                        <p className="text-[7px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Usuários</p>
-                        <p className="text-xs font-black text-white">{formatNumber(stats.totalUsers)}</p>
-                      </div>
-                      <div className="w-px h-6 bg-white/5" />
-                      <div className="text-center">
-                        <p className="text-[7px] text-slate-500 font-black uppercase tracking-widest mb-0.5">MRR</p>
-                        <p className="text-xs font-black text-sky-400">{formatCurrency(stats.totalRevenue)}</p>
-                      </div>
-                   </div>
-                   <button 
-                    onClick={() => handleSaveVertical(v)}
+                <div className="flex items-center space-x-6">
+                  <div className="flex space-x-8 mr-4">
+                    <div className="text-center">
+                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Clientes</p>
+                      <p className="text-sm font-black text-white">{formatNumber(stats.totalClients)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Usuários</p>
+                      <p className="text-sm font-black text-white">{formatNumber(stats.totalUsers)}</p>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (unsavedVerticals.has(v)) handleSave(v);
+                    }}
                     className={cn(
-                      "flex items-center px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all",
-                      saveStatus[v] 
-                        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
-                        : "bg-white text-slate-950 hover:bg-slate-200 shadow-lg"
+                      "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
+                      unsavedVerticals.has(v)
+                        ? "bg-sky-500 text-white shadow-lg shadow-sky-500/20 hover:bg-sky-400 active:scale-95" 
+                        : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed"
                     )}
-                   >
-                     {saveStatus[v] ? <ShieldCheck className="w-4 h-4 mr-1.5" /> : <Settings2 className="w-4 h-4 mr-1.5" />}
-                     {saveStatus[v] ? 'SALVO' : 'GRAVAR'}
-                   </button>
+                  >
+                    <Target className="w-3.5 h-3.5 mr-2" />
+                    Gravar
+                  </button>
+
+                  <div className="p-1">
+                    {expandedVerticals[v] ? <ChevronUp className="w-5 h-5 text-slate-500" /> : <ChevronDown className="w-5 h-5 text-slate-500" />}
+                  </div>
                 </div>
               </div>
 
-              <div className="p-8 grid grid-cols-12 gap-8">
-                <div className="col-span-4 space-y-8">
-                  <div className="space-y-5">
-                    <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Calibração</h3>
-                    <div className="space-y-5">
-                      {[
-                        { key: 'suporteTreinamento', label: 'Suporte / Treinamento', color: 'text-sky-400' },
-                        { key: 'relacionamento', label: 'Relacionamento', color: 'text-indigo-400' },
-                        { key: 'gestaoContratual', label: 'Gestão Contratual', color: 'text-amber-400' }
-                      ].map((item) => (
-                        <div key={item.key} className="space-y-3">
-                          <div className="flex justify-between items-center text-[9px] font-black uppercase">
-                            <span className="text-slate-500 tracking-tight">{item.label}</span>
-                            <span className={cn("px-1.5 py-0.5 rounded bg-slate-950 border border-white/5", item.color)}>
-                              {EFFORT_LABELS[(opSettings[v] as any)[item.key]] || 'Médio'}
-                            </span>
-                          </div>
-                          <input 
-                            type="range" min="25" max="100" step="25"
-                            value={(opSettings[v] as any)[item.key]}
-                            onChange={(e) => updateOpSetting(v, item.key as any, parseInt(e.target.value))}
-                            className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-white"
-                          />
+              <AnimatePresence>
+                {expandedVerticals[v] && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-8 grid grid-cols-2 gap-12">
+                      {/* Calibration Section */}
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                            <Settings2 className="w-4 h-4 mr-2 text-indigo-400" />
+                            Calibração de Esforço
+                          </h3>
                         </div>
-                      ))}
+
+                        {[
+                          { key: 'suporteTreinamento', label: 'Suporte / Treinamento' },
+                          { key: 'relacionamento', label: 'Relacionamento' },
+                          { key: 'gestaoContratual', label: 'Gestão Contratual' }
+                        ].map((item) => (
+                          <div key={item.key} className="space-y-3">
+                            <div className="flex justify-between items-center text-[11px] font-bold">
+                              <span className="text-slate-300 uppercase tracking-tight">{item.label}</span>
+                              <span className="text-white font-black">{effortLevelLabels[(opSettings[v] as any)[item.key]]}</span>
+                            </div>
+                            <div className="relative px-1">
+                              <input 
+                                type="range" 
+                                min="0" 
+                                max="3" 
+                                step="1"
+                                value={(opSettings[v] as any)[item.key]}
+                                onChange={(e) => updateOpSetting(v, item.key as any, parseInt(e.target.value))}
+                                className="w-full accent-sky-500 h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                              />
+                              <div className="flex justify-between mt-2 text-[8px] text-slate-700 font-bold px-0.5">
+                                <span>BAIXO</span><span>MÉDIO</span><span>ALTO</span><span>MUITO ALTO</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Capacidade Visitas/Mês</label>
+                            <input 
+                              type="number"
+                              value={opSettings[v].capacidadeVisitasPresenciaisMes}
+                              onChange={(e) => updateOpSetting(v, 'capacidadeVisitasPresenciaisMes', parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-sky-500 transition-colors"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Capacidade Contatos/Mês</label>
+                            <input 
+                              type="number"
+                              value={opSettings[v].capacidadeContatosRemotosMes}
+                              onChange={(e) => updateOpSetting(v, 'capacidadeContatosRemotosMes', parseInt(e.target.value) || 0)}
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-sky-500 transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Profile Recommended */}
+                  <div className="mt-8 pt-6 border-t border-white/5">
+                    <div className="bg-gradient-to-br from-sky-500/10 to-indigo-500/10 border border-sky-500/20 p-5 rounded-2xl relative overflow-hidden group">
+                      <div className="absolute right-0 top-0 w-1 h-full bg-sky-500" />
+                      <ShieldCheck className="absolute right-4 bottom-4 w-12 h-12 text-sky-500/10 group-hover:scale-110 transition-transform" />
+                      
+                      <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-2">Perfil Recomendado (CS)</p>
+                      <div className="flex items-baseline space-x-2">
+                        <h4 className="text-2xl font-black text-white uppercase tracking-tight">
+                          {getRecommendedProfile(opSettings[v])}
+                        </h4>
+                        <span className="text-[10px] text-slate-500 font-bold">Indicado pela Calibração</span>
+                      </div>
                     </div>
                   </div>
 
-                  {(() => {
-                    const profile = getRecommendedProfile(opSettings[v]);
-                    return (
-                      <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-5 relative overflow-hidden group">
-                        <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-3">Perfil CS Indicado</h4>
-                        <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center border border-white/10 text-white font-black text-lg shadow-2xl transition-transform">
-                            {profile.title.charAt(profile.title.lastIndexOf(' ') + 1)}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs font-black text-white uppercase tracking-tight leading-none mb-1">{profile.title}</p>
-                            <p className="text-[9px] text-slate-500 font-medium leading-relaxed">{profile.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-start space-x-3">
+                    <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-slate-400 leading-relaxed">A calibração de complexidade recomenda o perfil de Customer Success ideal com base nas demandas de suporte, relacionamento e gestão.</p>
+                  </div>
                 </div>
 
-                <div className="col-span-4 space-y-8 border-x border-white/5 px-8">
+                {/* Goals & Classification */}
+                <div className="space-y-8">
                   <div className="space-y-6">
-                    <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Metas Cobertura</h3>
-                    <div className="space-y-6">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                      <Target className="w-4 h-4 mr-2 text-rose-400" />
+                      Metas de Cobertura Operacional
+                    </h3>
+                    
+                    <div className="space-y-4">
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center bg-slate-950/50 px-3 py-2 rounded-xl border border-white/5 text-[9px] font-black uppercase">
-                          <span className="text-slate-500">Visitas / user / ano</span>
-                          <span className="text-white bg-slate-900 px-2 py-0.5 rounded shadow-inner border border-white/5">{opParams[v].visitasAno}x</span>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center text-[11px] font-bold text-slate-300 whitespace-nowrap">
+                            <Calendar className="w-3.5 h-3.5 mr-2 text-sky-500" />
+                            Visitas presenciais / user / ano
+                          </div>
+                          <span className="text-white font-black text-sm">{opParams[v].visitasAno}x</span>
                         </div>
-                        <div className="relative px-1">
+                        <div className="relative px-2">
                           <input 
-                            type="range" step="0.5" min="0.5" max="2" 
+                            type="range" step="0.5" min="0" max="2" 
                             value={opParams[v].visitasAno}
                             onChange={(e) => updateOpParam(v, 'visitasAno', parseFloat(e.target.value))}
-                            className="w-full accent-emerald-400 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                            className="w-full accent-sky-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
                           />
+                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-1">
+                            <span>0</span><span>0.5</span><span>1</span><span>1.5</span><span>2x</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center bg-slate-950/50 px-3 py-2 rounded-xl border border-white/5 text-[9px] font-black uppercase">
-                          <span className="text-slate-500">Remotos / user / ano</span>
-                          <span className="text-white bg-slate-900 px-2 py-0.5 rounded shadow-inner border border-white/5">{opParams[v].contatosRemotosAno}x</span>
+                      <div className="space-y-3 pt-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center text-[11px] font-bold text-slate-300 whitespace-nowrap">
+                            <Phone className="w-3.5 h-3.5 mr-2 text-emerald-500" />
+                            Contatos remotos / user / ano
+                          </div>
+                          <span className="text-white font-black text-sm">{opParams[v].contatosRemotosAno}x</span>
                         </div>
-                        <div className="relative px-1">
+                        <div className="relative px-2">
                           <input 
-                            type="range" step="0.5" min="0.5" max="3" 
+                            type="range" step="0.1" min="0" max="3" 
                             value={opParams[v].contatosRemotosAno}
-                            onChange={(e) => updateOpParam(v, 'contatosRemotosAno', parseFloat(e.target.value))}
-                            className="w-full accent-sky-400 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              // Special values as requested: 0, 0.4, 1, 1.5, 2, 2.5, 3
+                              const snaps = [0, 0.4, 1, 1.5, 2, 2.5, 3];
+                              const snapped = snaps.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                              updateOpParam(v, 'contatosRemotosAno', snapped);
+                            }}
+                            className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
                           />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-3">
-                        <div className="space-y-2">
-                           <p className="text-[8px] font-black text-slate-500 uppercase text-center">Capacidade Visitas/Mês</p>
-                           <input 
-                            type="number"
-                            value={opParams[v].capacidadeVisitasMes}
-                            onChange={(e) => updateOpParam(v, 'capacidadeVisitasMes', parseInt(e.target.value) || 0)}
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs font-black text-white focus:border-emerald-500 outline-none transition-colors"
-                           />
-                        </div>
-                        <div className="space-y-2">
-                           <p className="text-[8px] font-black text-slate-500 uppercase text-center">Capacidade Remotos/Mês</p>
-                           <input 
-                            type="number"
-                            value={opParams[v].capacidadeRemotosMes}
-                            onChange={(e) => updateOpParam(v, 'capacidadeRemotosMes', parseInt(e.target.value) || 0)}
-                            className="w-full bg-slate-950 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs font-black text-white focus:border-sky-500 outline-none transition-colors"
-                           />
+                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-1">
+                            <span>0</span><span>0.4</span><span>1</span><span>2</span><span>3x</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3 pt-6">
-                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Classificação Base</h4>
-                    <div className="grid grid-cols-1 gap-2">
+                  <div className="space-y-6 pt-4">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                      <Users className="w-4 h-4 mr-2 text-amber-400" />
+                      Classificação da Base de Usuários
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
                       {[
-                        { key: 'percentDesuso', label: 'Em Desuso', color: 'text-rose-400', bg: 'bg-rose-500/5 border-rose-500/10' },
-                        { key: 'percentRemotos', label: 'Remotos', color: 'text-amber-400', bg: 'bg-amber-500/5 border-amber-500/10' },
-                        { key: 'percentNaoAcessiveis', label: 'N-Acessíveis', color: 'text-slate-400', bg: 'bg-slate-500/5 border-slate-500/10' },
-                      ].map((item) => (
-                        <div key={item.key} className={cn("p-2.5 rounded-xl border flex items-center justify-between transition-colors", item.bg)}>
-                          <div className="flex flex-col">
-                            <span className="text-[8px] font-black uppercase text-slate-500 mb-0.5">{item.label}</span>
-                            <span className={cn("text-xs font-black text-white")}>{formatNumber(Math.round((stats.totalUsers * (opParams[v] as any)[item.key]) / 100))}</span>
-                          </div>
-                          <div className="flex items-center bg-slate-950/40 border border-white/10 rounded-lg px-2 py-0.5 shadow-inner">
-                             <input 
+                        { key: 'percentDesuso', label: 'Em Desuso', color: 'text-rose-400', bg: 'bg-rose-500/10' },
+                        { key: 'percentRemotos', label: 'Remotos', color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                        { key: 'percentNaoAcessiveis', label: 'Não acessíveis', color: 'text-slate-400', bg: 'bg-slate-500/10' },
+                      ].map((item) => {
+                        const percentage = (opParams[v] as any)[item.key];
+                        const absoluteValue = Math.round((percentage / 100) * stats.totalUsers);
+                        
+                        return (
+                          <div key={item.key} className={cn("p-4 rounded-2xl border border-white/5", item.bg)}>
+                            <p className="text-[9px] font-black uppercase text-slate-400 mb-2 leading-tight h-5">{item.label}</p>
+                            <div className="flex items-center space-x-2">
+                              <input 
                                 type="number" 
-                                value={(opParams[v] as any)[item.key]}
+                                value={percentage}
                                 onChange={(e) => updateOpParam(v, item.key as any, Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                                className="bg-transparent text-[11px] font-bold text-white w-6 outline-none text-right"
+                                className="bg-transparent text-xl font-black text-white w-12 outline-none"
                               />
-                              <span className="text-[8px] font-black text-slate-600 ml-1">%</span>
+                              <span className="text-xs font-bold text-slate-500">%</span>
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-500 mt-1">
+                              {formatNumber(absoluteValue)} usuários
+                            </p>
+                            <div className="h-1 bg-white/10 rounded-full mt-3 overflow-hidden">
+                              <div className="h-full bg-current opacity-60" style={{ width: `${percentage}%`, color: 'inherit' }} />
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-4 flex flex-col space-y-6">
-                  <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Headcount FTE</h3>
-                  <div className="space-y-4">
-                    <div className="p-6 bg-slate-950 rounded-2xl text-white shadow-2xl relative overflow-hidden border border-white/5">
-                       <p className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center">
-                          <Target className="w-3 h-3 mr-2 text-emerald-400" />
-                          Headcount Projetado
-                       </p>
-                       <div className="flex items-baseline space-x-2 relative z-10">
-                          <span className="text-6xl font-black tracking-tighter text-emerald-400 leading-none drop-shadow-[0_0_10px_rgba(52,211,153,0.3)]">{headcountEstimado}</span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">FTE</span>
-                      </div>
-                      <Users className="absolute -right-3 -bottom-3 w-20 h-20 text-white/[0.02]" />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 pt-2">
-                      <div className="bg-rose-500/5 border border-rose-500/10 p-4 rounded-xl flex justify-between items-center group">
-                        <span className="text-[9px] font-black text-rose-400 uppercase">Em Desuso (Foco CS)</span>
-                        <div className="flex flex-col items-end">
-                           <span className="text-base font-black text-white">{formatNumber(userCountInDesuso)}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-sky-500/5 border border-sky-500/10 p-4 rounded-xl flex justify-between items-center">
-                        <span className="text-[9px] font-black text-sky-400 uppercase">Visitas / Ano</span>
-                        <div className="flex flex-col items-end">
-                           <span className="text-base font-black text-white">{formatNumber(Math.round(totalVisitasNecessarias))}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-indigo-500/5 border border-indigo-500/10 p-4 rounded-xl flex justify-between items-center">
-                        <span className="text-[9px] font-black text-indigo-400 uppercase">Contatos / Ano</span>
-                        <div className="flex flex-col items-end">
-                           <span className="text-base font-black text-white">{formatNumber(Math.round(totalRemotosNecessarios))}</span>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
             </motion.div>
-          );
-        })}
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen w-full bg-[#020617] text-slate-100 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-[#0f172a] text-slate-100 overflow-hidden font-sans"
+         style={{ backgroundImage: 'radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%)' }}>
       
-      {/* Sidebar - Remains darker for contrast */}
-      <aside className="w-68 flex flex-col bg-[#050b1a] border-r border-white/5 shrink-0 z-50 shadow-2xl">
-        <div className="p-8 pb-10">
-          <div className="flex items-center px-1 mb-10">
-            <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20 mr-4 text-white">
-              <BarChart3 className="w-6 h-6" />
+      {/* Sidebar */}
+      <aside className={cn(
+        "flex flex-col bg-slate-950/40 border-r border-white/10 shrink-0 z-50 transition-all duration-300 relative",
+        isSidebarCollapsed ? "w-20" : "w-64"
+      )}>
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-24 w-6 h-6 bg-slate-900 border border-white/10 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors z-50"
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
+        <div className={cn("p-6 pb-10", isSidebarCollapsed && "px-4")}>
+          <div className="flex items-center px-1 mb-10 overflow-hidden">
+            <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20 mr-4 shrink-0">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase leading-none mb-1">Cortex</span>
-              <span className="text-lg font-black text-white tracking-tighter leading-none">BI PLATFORM</span>
-            </div>
+            {!isSidebarCollapsed && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col"
+              >
+                <span className="text-xs font-black tracking-widest text-slate-500 uppercase leading-none mb-1">Cortex</span>
+                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap">BI PLATFORM</span>
+              </motion.div>
+            )}
           </div>
 
-          <nav className="space-y-1.5">
+          <nav className="space-y-2">
             {[
-              { id: 'dashboard', label: 'Dashboard Analítico', icon: LayoutDashboard },
-              { id: 'operational', label: 'Capacidade CS', icon: ShieldCheck },
+              { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
+              { id: 'operational', label: 'Capacidade Operacional CS', icon: ShieldCheck },
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id as View)}
                 className={cn(
-                  "w-full flex items-center px-4 py-3 rounded-xl text-sm font-bold transition-all group",
+                  "w-full flex items-center px-4 py-3 rounded-xl text-sm font-bold transition-all group overflow-hidden",
                   currentView === item.id 
-                    ? "bg-sky-500 text-white shadow-lg shadow-sky-500/20" 
-                    : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
+                    ? "bg-sky-500/10 text-sky-400 border border-sky-500/20" 
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 mr-3", currentView === item.id ? "text-white" : "text-slate-500")} />
-                {item.label}
+                <item.icon className={cn("w-5 h-5 shrink-0 transition-colors", 
+                  !isSidebarCollapsed && "mr-3",
+                  currentView === item.id ? "text-sky-400" : "text-slate-600 group-hover:text-slate-400"
+                )} />
+                {!isSidebarCollapsed && (
+                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap">
+                    {item.label}
+                  </motion.span>
+                )}
               </button>
             ))}
           </nav>
         </div>
 
-        <div className="mt-auto p-8 pt-0">
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-            <div className="flex items-center mb-4">
-              <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center mr-3 border border-white/10">
-                <Users className="w-5 h-5 text-slate-400" />
-              </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-[11px] font-bold text-white truncate uppercase tracking-tight">Bruno Chayb</span>
-                <span className="text-[9px] text-slate-500 font-bold tracking-widest uppercase truncate">Enterprise Lead</span>
-              </div>
-            </div>
-            <div className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] bg-slate-950/50 p-2.5 rounded-lg text-center border border-white/5 cursor-pointer hover:bg-white/10 transition-all">
-              Log out
-            </div>
-          </div>
+        <div className="mt-auto p-6 pt-0">
+          {/* Section removed per request */}
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 p-8 relative bg-[#020617] overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 p-6 relative">
         <AnimatePresence mode="wait">
           {currentView === 'dashboard' ? (
             <motion.div 
               key="dashboard"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="flex-1 flex flex-col min-h-0"
             >
-              {renderExecutiveDashboard()}
+              {renderDashboard()}
             </motion.div>
           ) : (
             <motion.div 
               key="operational"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="flex-1 flex flex-col min-h-0"
             >
-              {renderExecutiveOperational()}
+              {renderOperational()}
             </motion.div>
           )}
         </AnimatePresence>

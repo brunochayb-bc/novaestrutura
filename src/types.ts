@@ -32,6 +32,8 @@ export interface OperationalSettings {
   suporteTreinamento: number;
   relacionamento: number;
   gestaoContratual: number;
+  capacidadeVisitasPresenciaisMes: number;
+  capacidadeContatosRemotosMes: number;
 }
 
 export interface VerticalOperationalParams {
@@ -40,8 +42,6 @@ export interface VerticalOperationalParams {
   percentDesuso: number;
   percentRemotos: number;
   percentNaoAcessiveis: number;
-  capacidadeVisitasMes: number;
-  capacidadeRemotosMes: number;
 }
 
 export interface DashboardData {
