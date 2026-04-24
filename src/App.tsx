@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -67,12 +67,24 @@ export default function App() {
   const initialParams: Record<Vertical, VerticalOperationalParams> = {
     'Financeiro I': { visitasAno: 1, contatosRemotosAno: 1, percentDesuso: 15, percentRemotos: 60, percentNaoAcessiveis: 5 },
     'Financeiro II': { visitasAno: 0.5, contatosRemotosAno: 2, percentDesuso: 20, percentRemotos: 70, percentNaoAcessiveis: 10 },
-    'Governo': { visitasAno: 1.5, contatosRemotosAno: 0.4, percentDesuso: 10, percentRemotos: 30, percentNaoAcessiveis: 20 },
+    'Governo': { visitasAno: 1.5, contatosRemotosAno: 1, percentDesuso: 10, percentRemotos: 30, percentNaoAcessiveis: 20 },
     'Agro/Corp': { visitasAno: 1, contatosRemotosAno: 1.5, percentDesuso: 25, percentRemotos: 80, percentNaoAcessiveis: 15 },
   };
 
-  const [opSettings, setOpSettings] = useState(initialOpSettings);
-  const [opParams, setOpParams] = useState(initialParams);
+  const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(() => {
+    const saved = localStorage.getItem('opSettings');
+    return saved ? JSON.parse(saved) : initialOpSettings;
+  });
+  const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(() => {
+    const saved = localStorage.getItem('opParams');
+    return saved ? JSON.parse(saved) : initialParams;
+  });
+
+  // Persist to localStorage whenever state changes
+  useEffect(() => {
+    localStorage.setItem('opSettings', JSON.stringify(opSettings));
+    localStorage.setItem('opParams', JSON.stringify(opParams));
+  }, [opSettings, opParams]);
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
     'Financeiro I': true,
     'Financeiro II': false,
@@ -567,8 +579,11 @@ export default function App() {
                                 onChange={(e) => updateOpSetting(v, item.key as any, parseInt(e.target.value))}
                                 className="w-full accent-sky-500 h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer"
                               />
-                              <div className="flex justify-between mt-2 text-[8px] text-slate-700 font-bold px-0.5">
-                                <span>BAIXO</span><span>MÉDIO</span><span>ALTO</span><span>MUITO ALTO</span>
+                              <div className="flex justify-between mt-2 text-[8px] text-slate-700 font-bold px-0">
+                                <span className="w-0 flex justify-start whitespace-nowrap">BAIXO</span>
+                                <span className="w-0 flex justify-center whitespace-nowrap">MÉDIO</span>
+                                <span className="w-0 flex justify-center whitespace-nowrap">ALTO</span>
+                                <span className="w-0 flex justify-end whitespace-nowrap">MUITO ALTO</span>
                               </div>
                             </div>
                           </div>
@@ -636,13 +651,16 @@ export default function App() {
                         </div>
                         <div className="relative px-2">
                           <input 
-                            type="range" step="0.5" min="0" max="2" 
+                            type="range" step="0.5" min="0.5" max="2" 
                             value={opParams[v].visitasAno}
                             onChange={(e) => updateOpParam(v, 'visitasAno', parseFloat(e.target.value))}
                             className="w-full accent-sky-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
                           />
-                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-1">
-                            <span>0</span><span>0.5</span><span>1</span><span>1.5</span><span>2x</span>
+                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-0">
+                            <span className="w-0 flex justify-start whitespace-nowrap">0.5</span>
+                            <span className="w-0 flex justify-center whitespace-nowrap">1</span>
+                            <span className="w-0 flex justify-center whitespace-nowrap">1.5</span>
+                            <span className="w-0 flex justify-end whitespace-nowrap">2x</span>
                           </div>
                         </div>
                       </div>
@@ -657,19 +675,23 @@ export default function App() {
                         </div>
                         <div className="relative px-2">
                           <input 
-                            type="range" step="0.1" min="0" max="3" 
+                            type="range" step="0.5" min="1" max="3" 
                             value={opParams[v].contatosRemotosAno}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
-                              // Special values as requested: 0, 0.4, 1, 1.5, 2, 2.5, 3
-                              const snaps = [0, 0.4, 1, 1.5, 2, 2.5, 3];
+                              // Special values as requested: 1, 1.5, 2, 2.5, 3
+                              const snaps = [1, 1.5, 2, 2.5, 3];
                               const snapped = snaps.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
                               updateOpParam(v, 'contatosRemotosAno', snapped);
                             }}
                             className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
                           />
-                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-1">
-                            <span>0</span><span>0.4</span><span>1</span><span>2</span><span>3x</span>
+                          <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-0">
+                            <span className="w-0 flex justify-start whitespace-nowrap">1</span>
+                            <span className="w-0 flex justify-center whitespace-nowrap">1.5</span>
+                            <span className="w-0 flex justify-center whitespace-nowrap">2</span>
+                            <span className="w-0 flex justify-center whitespace-nowrap">2.5</span>
+                            <span className="w-0 flex justify-end whitespace-nowrap">3x</span>
                           </div>
                         </div>
                       </div>
@@ -711,6 +733,45 @@ export default function App() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Operational Portfolio Summary */}
+                  <div className="mt-8 pt-6 border-t border-white/5 space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                      <BarChart3 className="w-4 h-4 mr-2 text-sky-400" />
+                      Detalhamento da Carteira Relevante
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { 
+                          label: 'Carteira Ativa p/ Visitação', 
+                          value: Math.round(stats.totalUsers * (1 - opParams[v].percentNaoAcessiveis / 100)),
+                          sub: 'Total - Não Acessíveis',
+                          color: 'text-emerald-400',
+                          bg: 'bg-emerald-500/5'
+                        },
+                        { 
+                          label: 'Carteira Ativa p/ Remoto', 
+                          value: Math.round(stats.totalUsers * (opParams[v].percentRemotos / 100)),
+                          sub: 'Conforme % Remotos',
+                          color: 'text-amber-400',
+                          bg: 'bg-amber-500/5'
+                        },
+                        { 
+                          label: 'Carteira em Desuso', 
+                          value: Math.round(stats.totalUsers * (opParams[v].percentDesuso / 100)),
+                          sub: 'Conforme % Desuso',
+                          color: 'text-rose-400',
+                          bg: 'bg-rose-500/5'
+                        }
+                      ].map((item, i) => (
+                        <div key={i} className={cn("p-4 rounded-2xl border border-white/5", item.bg)}>
+                          <p className="text-[9px] font-black uppercase text-slate-500 mb-1 leading-tight h-5">{item.label}</p>
+                          <p className={cn("text-xl font-black mb-0.5", item.color)}>{formatNumber(item.value)}</p>
+                          <p className="text-[8px] font-bold text-slate-600 uppercase tracking-tighter">{item.sub}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
