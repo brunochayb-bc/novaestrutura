@@ -879,8 +879,8 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="flex flex-col"
               >
-                <span className="text-xs font-black tracking-widest text-slate-500 uppercase leading-none mb-1">Cortex</span>
-                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap">BI PLATFORM</span>
+                <span className="text-xs font-black tracking-widest text-slate-500 uppercase leading-none mb-1">DashBoard</span>
+                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap">VENDAS</span>
               </motion.div>
             )}
           </div>
