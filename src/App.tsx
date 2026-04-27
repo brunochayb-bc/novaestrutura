@@ -245,6 +245,12 @@ export default function App() {
                       <div className="bg-slate-900 rounded-[11px] px-6 py-4 text-center min-w-[180px]">
                         <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{v.isCS ? 'Unidade' : 'Vertical'}</p>
                         <h4 className="text-sm font-black text-white uppercase truncate">{v.name}</h4>
+                        {v.isCS && (
+                          <div className="mt-2 pt-2 border-t border-white/5">
+                            <p className="text-[8px] text-indigo-400 font-bold uppercase leading-none">Direcionamento Funcional</p>
+                            <p className="text-[7px] text-slate-500 font-bold uppercase mt-1">Das Verticais</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -259,7 +265,7 @@ export default function App() {
                     transition={{ delay: 0.4 + i * 0.1 }}
                     className={cn(
                       "px-4 py-3 text-center min-w-[160px] border rounded-xl",
-                      v.isCS ? "bg-indigo-500/10 border-indigo-500/20" : "bg-slate-900/50 border-white/5"
+                      v.isCS ? "bg-indigo-500/10 border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]" : "bg-slate-900/50 border-white/5"
                     )}
                   >
                     {v.isCS ? (
@@ -280,8 +286,14 @@ export default function App() {
               ))}
             </div>
 
-            {/* Matrix Direction Line */}
-            <div className="absolute top-[60px] left-[10%] right-[20%] h-[100px] border-b border-white/5 border-dashed rounded-br-3xl pointer-events-none" />
+            {/* Matrix Direction Line: Functional guidance from Vertical Heads to CS */}
+            <div className="absolute top-[68px] left-[10%] right-[10%] h-px border-t border-dashed border-indigo-500/30 pointer-events-none" />
+            <div className="absolute top-[68px] right-[9.5%] w-2 h-2 border-t border-r border-indigo-500/40 rotate-45 -translate-y-1/2 pointer-events-none" />
+            <div className="absolute top-[64px] left-[10%] right-[30%] flex justify-between pointer-events-none opacity-40">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="w-2 h-2 rounded-full bg-indigo-500/20 border border-indigo-500/30" />
+              ))}
+            </div>
           </div>
 
           {/* Legend / Info */}
