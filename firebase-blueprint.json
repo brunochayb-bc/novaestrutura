@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "VerticalData": {
+      "title": "Vertical Operational Data",
+      "description": "Operational settings and parameters for each vertical",
+      "type": "object",
+      "properties": {
+        "settings": {
+          "type": "object",
+          "properties": {
+            "suporteTreinamento": { "type": "number" },
+            "relacionamento": { "type": "number" },
+            "gestaoContratual": { "type": "number" },
+            "capacidadeVisitasPresenciaisMes": { "type": "number" },
+            "capacidadeContatosRemotosMes": { "type": "number" }
+          }
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "visitasAno": { "type": "number" },
+            "contatosRemotosAno": { "type": "number" },
+            "percentDesuso": { "type": "number" },
+            "percentRemotos": { "type": "number" },
+            "percentNaoAcessiveis": { "type": "number" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["settings", "params", "updatedAt"]
+    },
+    "GlobalSettings": {
+      "title": "Global Application Settings",
+      "description": "Settings that apply to the whole app",
+      "type": "object",
+      "properties": {
+        "execCapacity": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["execCapacity", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "verticalData/{verticalId}": {
+      "schema": "VerticalData",
+      "description": "Operational data per vertical"
+    },
+    "settings/global": {
+      "schema": "GlobalSettings",
+      "description": "Global settings like exec capacity"
+    }
+  }
+}

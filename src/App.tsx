@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { rawSalesData, SalesClient } from './services/salesData';
 import { 
   Users, 
@@ -21,7 +21,8 @@ import {
   Info,
   Menu,
   ChevronLeft,
-  Briefcase
+  Briefcase,
+  Save,
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -38,6 +39,7 @@ import { getDashboardData } from './data';
 import { cn, formatCurrency, formatNumber } from './lib/utils';
 import { Vertical, OperationalSettings, VerticalOperationalParams } from './types';
 import { motion, AnimatePresence } from 'motion/react';
+import { verticalDataService, globalSettingsService } from './services/firebaseService';
 
 const VERTICAL_COLORS: Record<Vertical, string> = {
   'Financeiro I': '#0ea5e9',   // Blue
@@ -58,6 +60,9 @@ export default function App() {
     direction: 'desc' 
   });
 
+  // Firebase Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Operational Settings State
   const initialOpSettings: Record<Vertical, OperationalSettings> = {
     'Financeiro I': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 40 },
@@ -73,34 +78,84 @@ export default function App() {
     'Agro/Corp': { visitasAno: 1, contatosRemotosAno: 1.5, percentDesuso: 25, percentRemotos: 80, percentNaoAcessiveis: 15 },
   };
 
-  const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(() => {
-    const saved = localStorage.getItem('opSettings');
-    if (!saved) return initialOpSettings;
-    const parsed = JSON.parse(saved);
-    // Merge to ensure new fields are present
-    const merged = { ...initialOpSettings };
-    (Object.keys(parsed) as Vertical[]).forEach(v => {
-      merged[v] = { ...initialOpSettings[v], ...parsed[v] };
-    });
-    return merged;
-  });
-  const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(() => {
-    const saved = localStorage.getItem('opParams');
-    if (!saved) return initialParams;
-    const parsed = JSON.parse(saved);
-    // Merge to ensure new fields are present
-    const merged = { ...initialParams };
-    (Object.keys(parsed) as Vertical[]).forEach(v => {
-      merged[v] = { ...initialParams[v], ...parsed[v] };
-    });
-    return merged;
-  });
+  const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
+  const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(initialParams);
+  const [execCapacity, setExecCapacity] = useState(30);
 
-  // Persist to localStorage whenever state changes
+  // Firestore Loading Effect
   useEffect(() => {
-    localStorage.setItem('opSettings', JSON.stringify(opSettings));
-    localStorage.setItem('opParams', JSON.stringify(opParams));
-  }, [opSettings, opParams]);
+    const loadFirestoreData = async () => {
+      setIsSyncing(true);
+      try {
+        const [vData, cap] = await Promise.all([
+          verticalDataService.getAll(),
+          globalSettingsService.getExecCapacity()
+        ]);
+
+        if (Object.keys(vData).length > 0) {
+          const newOpSettings = { ...initialOpSettings };
+          const newOpParams = { ...initialParams };
+
+          (Object.keys(vData) as Vertical[]).forEach(v => {
+            if (vData[v].settings) newOpSettings[v] = vData[v].settings;
+            if (vData[v].params) newOpParams[v] = vData[v].params;
+          });
+
+          setOpSettings(newOpSettings);
+          setOpParams(newOpParams);
+        }
+
+        if (cap !== null) {
+          setExecCapacity(cap);
+        }
+      } catch (error) {
+        console.error('Failed to load Firestore data:', error);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    loadFirestoreData();
+  }, []);
+
+  const handleSave = async (vertical: Vertical) => {
+    setIsSyncing(true);
+    try {
+      await verticalDataService.saveVertical(vertical, opSettings[vertical], opParams[vertical]);
+      setUnsavedVerticals(prev => {
+        const next = new Set(prev);
+        next.delete(vertical);
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to save to Firestore:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSaveExecCapacity = async (val: number) => {
+    setIsSyncing(true);
+    try {
+      await globalSettingsService.saveExecCapacity(val);
+    } catch (error) {
+      console.error('Failed to save exec capacity:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const debouncedSaveExecCapacity = useCallback((val: number) => {
+    const timer = setTimeout(() => {
+      handleSaveExecCapacity(val);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const cleanup = debouncedSaveExecCapacity(execCapacity);
+    return cleanup;
+  }, [execCapacity]);
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
     'Financeiro I': false,
     'Financeiro II': false,
@@ -108,7 +163,6 @@ export default function App() {
     'Agro/Corp': false,
   });
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
-  const [execCapacity, setExecCapacity] = useState(30);
   const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
     'FINANCEIRO I': false,
     'FINANCEIRO II': false,
@@ -510,7 +564,7 @@ export default function App() {
     setExpandedSalesVerticals(prev => ({ ...prev, [v]: !prev[v] }));
   };
 
-  const handleSave = (vertical: Vertical) => {
+  const handleSave_Local = (vertical: Vertical) => {
     setUnsavedVerticals(prev => {
       const next = new Set(prev);
       next.delete(vertical);
@@ -1046,17 +1100,22 @@ export default function App() {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (unsavedVerticals.has(v)) handleSave(v);
+                      if (unsavedVerticals.has(v) && !isSyncing) handleSave(v);
                     }}
                     className={cn(
                       "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
                       unsavedVerticals.has(v)
-                        ? "bg-sky-500 text-white shadow-lg shadow-sky-500/20 hover:bg-sky-400 active:scale-95" 
-                        : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed"
+                        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
+                        : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
+                      isSyncing && "opacity-50 cursor-wait"
                     )}
                   >
-                    <Target className="w-3.5 h-3.5 mr-2" />
-                    Gravar
+                    {isSyncing ? (
+                      <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5 mr-2" />
+                    )}
+                    {unsavedVerticals.has(v) ? 'Gravar' : 'Gravado'}
                   </button>
 
                   <div className="p-1">
@@ -1394,7 +1453,7 @@ export default function App() {
             )}
           </div>
 
-          <nav className="space-y-2">
+          <nav className="space-y-1">
             {[
               { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
               { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
@@ -1405,24 +1464,42 @@ export default function App() {
                 key={item.id}
                 onClick={() => setCurrentView(item.id as View)}
                 className={cn(
-                  "w-full flex items-center px-4 py-3 rounded-xl text-sm font-bold transition-all group overflow-hidden",
+                  "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative",
                   currentView === item.id 
-                    ? "bg-sky-500/10 text-sky-400 border border-sky-500/20" 
-                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5 border border-transparent"
+                    ? "bg-white/10 text-white shadow-lg shadow-black/20" 
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 shrink-0 transition-colors", 
-                  !isSidebarCollapsed && "mr-3",
-                  currentView === item.id ? "text-sky-400" : "text-slate-600 group-hover:text-slate-400"
+                <item.icon className={cn(
+                  "w-5 h-5 mr-4 transition-all duration-200 shrink-0",
+                  currentView === item.id ? "text-sky-400" : "group-hover:text-slate-400"
                 )} />
                 {!isSidebarCollapsed && (
-                  <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-nowrap">
-                    {item.label}
-                  </motion.span>
+                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity">{item.label}</span>
+                )}
+                {currentView === item.id && (
+                  <motion.div 
+                    layoutId="activeTab"
+                    className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full"
+                  />
                 )}
               </button>
             ))}
           </nav>
+
+          {/* Sync Status */}
+          <div className="mt-10 pt-10 border-t border-white/5 space-y-4">
+            {isSyncing && !isSidebarCollapsed && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center px-4 space-x-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest"
+              >
+                <div className="w-2 h-2 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                <span>Sincronizando...</span>
+              </motion.div>
+            )}
+          </div>
         </div>
 
         <div className="mt-auto p-6 pt-0">
