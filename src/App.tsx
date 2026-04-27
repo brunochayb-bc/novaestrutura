@@ -491,6 +491,42 @@ export default function App() {
     </div>
   );
 
+  const opStatsSummary = useMemo(() => {
+    let totalHC = 0;
+    const profiles = { 'Júnior': 0, 'Pleno': 0, 'Sênior': 0 };
+
+    (Object.keys(opSettings) as Vertical[]).forEach((v) => {
+      const stats = data.verticals.find(vs => vs.vertical === v);
+      if (!stats) return;
+
+      const visitsAno = opParams[v]?.visitasAno || 0;
+      const contatosAno = opParams[v]?.contatosRemotosAno || 0;
+      const pNaoAcess = opParams[v]?.percentNaoAcessiveis || 0;
+      const pRemotos = opParams[v]?.percentRemotos || 0;
+      const pDesuso = opParams[v]?.percentDesuso || 0;
+
+      const baseVisits = Math.max(0, 1 - (pNaoAcess + pRemotos) / 100);
+      const baseRemotes = pRemotos / 100;
+      const baseDesuso = pDesuso / 100;
+
+      const vVisits = Math.round(stats.totalUsers * baseVisits * visitsAno);
+      const vRemotes = Math.round(stats.totalUsers * baseRemotes * contatosAno);
+      const vDesuso = Math.round(stats.totalUsers * baseDesuso);
+      
+      const totalDemand = vVisits + vRemotes + vDesuso;
+      const capVisits = opSettings[v]?.capacidadeVisitasPresenciaisMes || 0;
+      const capRemotes = opSettings[v]?.capacidadeContatosRemotosMes || 0;
+      const capPerYear = (capVisits + capRemotes) * 12;
+      const hc = capPerYear > 0 ? (totalDemand / capPerYear) : 0;
+
+      totalHC += hc;
+      const profile = getRecommendedProfile(opSettings[v]);
+      profiles[profile as keyof typeof profiles]++;
+    });
+
+    return { totalHC, profiles };
+  }, [opSettings, opParams, data]);
+
   const renderOperational = () => (
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
@@ -500,6 +536,51 @@ export default function App() {
       </header>
 
       <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
+        {/* Visão Geral Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-900/60 border border-emerald-500/20 rounded-3xl p-8 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <ShieldCheck className="w-24 h-24 text-emerald-500" />
+          </div>
+          
+          <div className="relative z-10">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-500 mb-6 flex items-center">
+              <span className="w-8 h-px bg-emerald-500/30 mr-3" />
+              Visão Geral Consolidada
+            </h3>
+
+            <div className="grid grid-cols-4 gap-8">
+              <div className="col-span-1 border-r border-white/10 pr-8">
+                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Headcount Total</p>
+                <div className="flex items-baseline space-x-2">
+                  <p className="text-5xl font-black text-emerald-400 tracking-tighter">{opStatsSummary.totalHC.toFixed(1)}</p>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium mt-2 leading-relaxed">
+                  Soma do headcount necessário across todas as verticais.
+                </p>
+              </div>
+
+              <div className="col-span-3 grid grid-cols-3 gap-6 pl-4">
+                {[
+                  { label: 'Perfil Júnior', count: opStatsSummary.profiles['Júnior'], color: 'text-sky-400', bg: 'bg-sky-500/10' },
+                  { label: 'Perfil Pleno', count: opStatsSummary.profiles['Pleno'], color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                  { label: 'Perfil Sênior', count: opStatsSummary.profiles['Sênior'], color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                ].map((profile) => (
+                  <div key={profile.label} className={cn("p-4 rounded-2xl border border-white/5 flex flex-col justify-center", profile.bg)}>
+                    <p className="text-[9px] font-black uppercase text-slate-500 mb-2 tracking-widest">{profile.label}</p>
+                    <div className="flex items-center justify-between">
+                      <span className={cn("text-2xl font-black", profile.color)}>{profile.count}</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Verticais</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.div>
         {(Object.keys(opSettings) as Vertical[]).map((v) => {
           const stats = data.verticals.find(vs => vs.vertical === v);
           if (!stats) return null;
@@ -833,7 +914,6 @@ export default function App() {
                           <div className="text-right">
                             <p className="text-3xl font-black text-emerald-400">
                               {hc}
-                              <span className="text-xs ml-1 uppercase opacity-60">FTEs</span>
                             </p>
                           </div>
                         </div>
