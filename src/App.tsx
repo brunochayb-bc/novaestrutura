@@ -102,30 +102,60 @@ export default function App() {
     localStorage.setItem('opParams', JSON.stringify(opParams));
   }, [opSettings, opParams]);
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
-    'Financeiro I': true,
+    'Financeiro I': false,
     'Financeiro II': false,
     'Governo': false,
     'Agro/Corp': false,
   });
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
-  const [execCapacity, setExecCapacity] = useState(15);
+  const [execCapacity, setExecCapacity] = useState(30);
+  const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
+    'FINANCEIRO I': false,
+    'FINANCEIRO II': false,
+    'GOVERNO': false,
+    'AGRO/CORP': false,
+  });
 
   const filteredSalesData = useMemo(() => {
     const verticals = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'];
-    const result: Record<string, { clients: SalesClient[], totalRevenue: number, headcount: number }> = {};
+    const result: Record<string, { 
+      clients: SalesClient[], 
+      totalRevenue: number, 
+      headcount: number,
+      fixedHC: number,
+      variableHC: number
+    }> = {};
 
     verticals.forEach(v => {
       let clients = rawSalesData.filter(c => c.vertical === v);
-      if (v !== 'FINANCEIRO I') {
-        clients = clients.filter(c => c.revenue > 10000);
-      }
+      // Filter applied to all verticals based on new disclaimer
+      clients = clients.filter(c => c.revenue > 10000);
       clients.sort((a, b) => b.revenue - a.revenue);
       
       const totalRevenue = clients.reduce((sum, c) => sum + c.revenue, 0);
+      
+      let fixedHC = 0;
+      let variableCount = clients.length;
+      
+      if (v === 'FINANCEIRO I') {
+        const specialAccounts = clients.filter(c => ['BRADESCO', 'ITAU UNIBANCO'].includes(c.name.toUpperCase()));
+        fixedHC = specialAccounts.length; 
+        variableCount = clients.length - fixedHC;
+      } else if (v === 'GOVERNO') {
+        const specialAccounts = clients.filter(c => ['BANCO DO BRASIL'].includes(c.name.toUpperCase()));
+        fixedHC = specialAccounts.length;
+        variableCount = clients.length - fixedHC;
+      }
+
+      const variableHC = variableCount / execCapacity;
+      const headcount = fixedHC + variableHC;
+
       result[v] = {
         clients,
         totalRevenue,
-        headcount: clients.length / execCapacity
+        headcount,
+        fixedHC,
+        variableHC
       };
     });
 
@@ -133,19 +163,154 @@ export default function App() {
   }, [execCapacity]);
 
   const salesTotals = useMemo(() => {
-    const values = Object.values(filteredSalesData) as Array<{ clients: SalesClient[], totalRevenue: number, headcount: number }>;
+    const values = Object.values(filteredSalesData) as Array<{ 
+      clients: SalesClient[], 
+      totalRevenue: number, 
+      headcount: number 
+    }>;
     const totalClients = values.reduce((sum, v) => sum + v.clients.length, 0);
     const totalRevenue = values.reduce((sum, v) => sum + v.totalRevenue, 0);
     const totalHeadcount = values.reduce((sum, v) => sum + v.headcount, 0);
-    return { totalClients, totalRevenue, totalHeadcount };
-  }, [filteredSalesData]);
+    
+    // Percentages based on user provided reference: 1.422 accounts
+    // Total revenue from getDashboardData() defaults to targets sum if not calculated from raw
+    const grandTotalAccounts = 1422;
+    const grandTotalRevenue = data.totalRevenue;
+
+    const accountPercentage = (totalClients / grandTotalAccounts) * 100;
+    const revenuePercentage = (totalRevenue / grandTotalRevenue) * 100;
+
+    return { 
+      totalClients, 
+      totalRevenue, 
+      totalHeadcount, 
+      accountPercentage, 
+      revenuePercentage,
+      grandTotalAccounts,
+      grandTotalRevenue
+    };
+  }, [filteredSalesData, data.totalRevenue]);
+
+  const renderOrganograma = () => (
+    <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+      <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+        <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-rose-400 bg-clip-text text-transparent">
+          Estrutura Organizacional
+        </h1>
+      </header>
+
+      <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-12 overflow-auto custom-scrollbar relative">
+        <div className="min-w-[1000px] flex flex-col items-center space-y-16">
+          
+          {/* Top Level: Diretor Comercial */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative"
+          >
+            <div className="bg-gradient-to-br from-rose-500 to-amber-500 p-[2px] rounded-2xl shadow-[0_0_30px_-5px_rgba(244,63,94,0.3)]">
+              <div className="bg-slate-950 rounded-[14px] px-10 py-6 border border-white/10 text-center">
+                <h3 className="text-xl font-black text-white uppercase">Diretor Comercial</h3>
+              </div>
+            </div>
+            {/* Main trunk down */}
+            <div className="absolute left-1/2 bottom-0 w-px h-16 bg-white/10 -translate-x-1/2 translate-y-full" />
+          </motion.div>
+
+          {/* Level 1: Verticals & CS */}
+          <div className="relative w-full">
+            {/* Horizontal connection line for all reporting units (Verticals + CS) */}
+            <div className="absolute top-0 left-[10%] right-[10%] h-px bg-white/10" />
+            
+            <div className="grid grid-cols-5 gap-8">
+              {/* Verticals */}
+              {[
+                { name: 'Financeiro I', color: 'from-sky-500 to-indigo-500', iconColor: 'text-sky-400' },
+                { name: 'Financeiro II', color: 'from-emerald-500 to-teal-500', iconColor: 'text-emerald-400' },
+                { name: 'Governo', color: 'from-amber-500 to-orange-500', iconColor: 'text-amber-400' },
+                { name: 'Agro/Corp', color: 'from-rose-500 to-pink-500', iconColor: 'text-rose-400' },
+                { name: 'Customer Success', color: 'from-indigo-500 to-purple-600', iconColor: 'text-indigo-400', isCS: true },
+              ].map((v, i) => (
+                <div key={v.name} className="flex flex-col items-center space-y-12">
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 + i * 0.1 }}
+                    className="relative group"
+                  >
+                    {/* Connection to top trunk */}
+                    <div className="absolute left-1/2 top-0 w-px h-8 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                    
+                    <div className={cn("bg-gradient-to-br p-[1px] rounded-xl shadow-lg transition-all group-hover:scale-105", v.color)}>
+                      <div className="bg-slate-900 rounded-[11px] px-6 py-4 text-center min-w-[180px]">
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{v.isCS ? 'Unidade' : 'Vertical'}</p>
+                        <h4 className="text-sm font-black text-white uppercase truncate">{v.name}</h4>
+                      </div>
+                    </div>
+                    
+                    {/* Stem down */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-12 bg-white/10 -translate-x-1/2 translate-y-full" />
+                  </motion.div>
+
+                  {/* Sub-level (Executivo or Specialists) */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 + i * 0.1 }}
+                    className={cn(
+                      "px-4 py-3 text-center min-w-[160px] border rounded-xl",
+                      v.isCS ? "bg-indigo-500/10 border-indigo-500/20" : "bg-slate-900/50 border-white/5"
+                    )}
+                  >
+                    {v.isCS ? (
+                      <>
+                        <div className="flex -space-x-1 justify-center mb-2">
+                          {[1, 2].map(j => <Users key={j} className="w-3 h-3 text-indigo-400" />)}
+                        </div>
+                        <p className="text-[10px] font-black text-white uppercase tracking-tighter">Especialistas CS</p>
+                      </>
+                    ) : (
+                      <>
+                        <Briefcase className={cn("w-4 h-4 mx-auto mb-2 opacity-50", v.iconColor)} />
+                        <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivo de Vendas</p>
+                      </>
+                    )}
+                  </motion.div>
+                </div>
+              ))}
+            </div>
+
+            {/* Matrix Direction Line */}
+            <div className="absolute top-[60px] left-[10%] right-[20%] h-[100px] border-b border-white/5 border-dashed rounded-br-3xl pointer-events-none" />
+          </div>
+
+          {/* Legend / Info */}
+          <div className="mt-12 flex items-center space-x-8 px-6 py-3 bg-slate-900/50 border border-white/5 rounded-full backdrop-blur-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-px bg-white/20" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Reporte Hierárquico</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-px border-t border-dashed border-white/40" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Direcionamento Funcional</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderExecutivos = () => (
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
-        <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-          Dimensionamento Executivos Vendas
-        </h1>
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+            Dimensionamento Executivos Vendas
+          </h1>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
+            A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês
+          </p>
+        </div>
         <div className="flex items-center space-x-6">
           <div className="flex flex-col items-end">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Capacidade Teórica</span>
@@ -162,70 +327,164 @@ export default function App() {
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-4 h-24 shrink-0">
+      <div className="grid grid-cols-4 gap-4 h-28 shrink-0">
         {[
-          { label: 'Total de Contas', value: salesTotals.totalClients, icon: Briefcase, color: 'bg-sky-500' },
-          { label: 'Headcount Necessário', value: salesTotals.totalHeadcount.toFixed(1), icon: Users, color: 'bg-emerald-500' },
-          { label: 'Faturamento Total (Contas)', value: formatCurrency(salesTotals.totalRevenue), icon: DollarSign, color: 'bg-indigo-500' },
-          { label: 'Ticket Médio/Conta', value: formatCurrency(salesTotals.totalClients > 0 ? salesTotals.totalRevenue / salesTotals.totalClients : 0), icon: Target, color: 'bg-amber-500' },
+          { 
+            label: 'Aderência Contas (Top)', 
+            value: salesTotals.totalClients, 
+            sub: `${salesTotals.accountPercentage.toFixed(1)}% do total (${salesTotals.grandTotalAccounts})`,
+            icon: Briefcase, color: 'text-sky-400', barColor: 'bg-sky-500' 
+          },
+          { 
+            label: 'Headcount Necessário', 
+            value: salesTotals.totalHeadcount.toFixed(1), 
+            sub: 'Sizing total consolidado',
+            icon: Users, color: 'text-emerald-400', barColor: 'bg-emerald-500' 
+          },
+          { 
+            label: 'Aderência Receita', 
+            value: formatCurrency(salesTotals.totalRevenue), 
+            sub: `${salesTotals.revenuePercentage.toFixed(1)}% da receita total`,
+            icon: DollarSign, color: 'text-indigo-400', barColor: 'bg-indigo-500' 
+          },
+          { 
+            label: 'Ticket Médio (Filtro)', 
+            value: formatCurrency(salesTotals.totalClients > 0 ? salesTotals.totalRevenue / salesTotals.totalClients : 0), 
+            sub: 'Baseado em contas > 10k',
+            icon: Target, color: 'text-amber-400', barColor: 'bg-amber-500' 
+          },
         ].map((stat, i) => (
-          <div key={i} className="bg-slate-950 border border-white/10 rounded-2xl p-4 flex flex-col justify-center relative overflow-hidden group shadow-xl">
-            <div className={cn("absolute right-0 top-0 w-1 h-full", stat.color)} />
-            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{stat.label}</p>
-            <p className="text-2xl font-black text-white tracking-tight">{stat.value}</p>
+          <div key={i} className="bg-slate-950 border border-white/10 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all hover:border-white/20">
+            <div className={cn("absolute right-0 top-0 w-1 h-full", stat.barColor)} />
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{stat.label}</p>
+              <stat.icon className={cn("w-4 h-4 opacity-50", stat.color)} />
+            </div>
+            <p className={cn("text-3xl font-black tracking-tight leading-none mb-1", stat.color)}>{stat.value}</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{stat.sub}</p>
           </div>
         ))}
       </div>
 
       <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
-        <div className="grid grid-cols-4 gap-6">
-          {(Object.entries(filteredSalesData) as Array<[string, { clients: SalesClient[], totalRevenue: number, headcount: number }]>).map(([v, data]) => (
-            <div key={v} className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col min-h-[400px]">
-              <div className="bg-slate-950/50 p-6 border-b border-white/5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-black text-white uppercase tracking-tight">{v}</h2>
-                  <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">MRR Total</p>
-                    <p className="text-sm font-black text-white">{formatCurrency(data.totalRevenue)}</p>
+        <div className="grid grid-cols-4 gap-6 items-start">
+          {(Object.entries(filteredSalesData) as Array<[string, { 
+            clients: SalesClient[], 
+            totalRevenue: number, 
+            headcount: number,
+            fixedHC: number,
+            variableHC: number
+          }]>).map(([v, data]) => {
+            const revenueParticipation = (data.totalRevenue / salesTotals.totalRevenue) * 100;
+
+            return (
+              <div key={v} className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col h-fit">
+                <div className="bg-slate-950/50 p-6 border-b border-white/5 flex flex-col h-[340px]">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-black text-white uppercase tracking-tight">{v}</h2>
+                    <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Sizing (HC)</p>
-                    <p className="text-sm font-black text-sky-400">{data.headcount.toFixed(1)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-auto p-4 space-y-2">
-                {data.clients.map((c, idx) => {
-                  const isKeyAccount = ['BRADESCO', 'ITAU UNIBANCO', 'SANTANDER BRASIL', 'BANCO DO BRASIL'].includes(c.name.toUpperCase());
-                  return (
-                    <div key={idx} className={cn(
-                      "border rounded-xl p-3 flex justify-between items-center group transition-colors relative",
-                      isKeyAccount 
-                        ? "bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]" 
-                        : "bg-white/5 border-white/5 hover:bg-white/10"
-                    )}>
-                      <div className="flex items-center space-x-3 min-w-0">
-                        <span className={cn(
-                          "text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shrink-0",
-                          isKeyAccount ? "bg-amber-500/30 text-amber-400" : "bg-white/5 text-slate-500"
-                        )}>
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className={cn("text-xs font-black truncate", isKeyAccount ? "text-amber-300" : "text-white")} title={c.name}>{c.name}</p>
-                          <p className="text-[9px] text-slate-500 font-bold uppercase">{formatNumber(c.users)} usuários</p>
-                        </div>
+                  
+                  <div className="space-y-6 flex-1 flex flex-col">
+                    <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-4">
+                      <div>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 flex items-center">
+                          MRR 
+                          <span className="ml-2 text-[8px] text-emerald-500/80 font-black">({revenueParticipation.toFixed(1)}%)</span>
+                        </p>
+                        <p className="text-base font-black text-white">{formatCurrency(data.totalRevenue)}</p>
                       </div>
-                      <span className={cn("text-[10px] font-mono font-black ml-2 whitespace-nowrap", isKeyAccount ? "text-amber-400" : "text-emerald-400")}>{formatCurrency(c.revenue)}</span>
+                      <div className="text-right">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Total HC</p>
+                        <p className="text-base font-black text-sky-400">{data.headcount.toFixed(1)}</p>
+                      </div>
                     </div>
-                  );
-                })}
+                    
+                    <div className="space-y-3 flex-1">
+                      {data.fixedHC > 0 ? (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl h-[76px] flex flex-col justify-center">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
+                              <ShieldCheck className="w-3 h-3 mr-1" />
+                              Fixed Headcount
+                            </span>
+                            <span className="text-[11px] font-black text-amber-400">{data.fixedHC.toFixed(1)}</span>
+                          </div>
+                          <p className="text-[9px] text-slate-500 font-medium leading-tight">
+                            {v === 'FINANCEIRO I' ? 'Bradesco e Itaú' : 'Banco do Brasil'} possuem HC dedicado.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="h-[76px] flex items-center justify-center border border-dashed border-white/5 rounded-xl opacity-20">
+                          <span className="text-[8px] font-bold uppercase text-slate-500">Sem Headcount Fixo</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 px-1 pt-1">
+                        <span className="flex items-center">
+                          <Users className="w-3 h-3 mr-1 opacity-50" />
+                          Proporcionais ({data.clients.length - data.fixedHC})
+                        </span>
+                        <span className="text-white">{data.variableHC.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => toggleSalesVertical(v)}
+                      className={cn(
+                        "mt-auto w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center justify-center space-x-2",
+                        expandedSalesVerticals[v] 
+                          ? "bg-white/10 border-white/20 text-white shadow-inner" 
+                          : "bg-sky-500/10 border-sky-500/20 text-sky-400 hover:bg-sky-500/20 shadow-lg shadow-sky-500/5"
+                      )}
+                    >
+                      <span>{expandedSalesVerticals[v] ? 'Recolher Clientes' : 'Ver relação de clientes'}</span>
+                      {expandedSalesVerticals[v] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <AnimatePresence>
+                  {expandedSalesVerticals[v] && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 400, opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="overflow-hidden bg-slate-950/30 border-t border-white/5"
+                    >
+                      <div className="p-4 space-y-2 h-full overflow-auto custom-scrollbar">
+                        {data.clients.map((c, idx) => {
+                          const isKeyAccount = ['BRADESCO', 'ITAU UNIBANCO', 'SANTANDER BRASIL', 'BANCO DO BRASIL'].includes(c.name.toUpperCase());
+                          return (
+                            <div key={idx} className={cn(
+                              "border rounded-xl p-3 flex justify-between items-center group transition-colors relative",
+                              isKeyAccount 
+                                ? "bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]" 
+                                : "bg-white/5 border-white/5 hover:bg-white/10"
+                            )}>
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <span className={cn(
+                                  "text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shrink-0",
+                                  isKeyAccount ? "bg-amber-500/30 text-amber-400" : "bg-white/5 text-slate-500"
+                                )}>
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className={cn("text-xs font-black truncate", isKeyAccount ? "text-amber-300" : "text-white")} title={c.name}>{c.name}</p>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase">{formatNumber(c.users)} usuários</p>
+                                </div>
+                              </div>
+                              <span className={cn("text-[10px] font-mono font-black ml-2 whitespace-nowrap", isKeyAccount ? "text-amber-400" : "text-emerald-400")}>{formatCurrency(c.revenue)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -233,6 +492,10 @@ export default function App() {
 
   const toggleVertical = (v: Vertical) => {
     setExpandedVerticals(prev => ({ ...prev, [v]: !prev[v] }));
+  };
+
+  const toggleSalesVertical = (v: string) => {
+    setExpandedSalesVerticals(prev => ({ ...prev, [v]: !prev[v] }));
   };
 
   const handleSave = (vertical: Vertical) => {
@@ -420,7 +683,12 @@ export default function App() {
         {/* Charts Section */}
         <div className="col-span-8 flex flex-col space-y-4 min-h-0">
           <div className="grid grid-cols-2 gap-4 h-[40%] shrink-0">
-            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col"
+            >
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <BarChart3 className="w-3.5 h-3.5 mr-2 text-sky-500" />
                 Receita por Vertical
@@ -445,9 +713,14 @@ export default function App() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col"
+            >
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <PieIcon className="w-3.5 h-3.5 mr-2 text-indigo-500" />
                 Participação de Mercado
@@ -492,10 +765,15 @@ export default function App() {
                   ))}
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="flex-1 bg-slate-900/60 border border-white/10 rounded-2xl p-5 flex flex-col min-h-0 shadow-inner overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex-1 bg-slate-900/60 border border-white/10 rounded-2xl p-5 flex flex-col min-h-0 shadow-inner overflow-hidden"
+          >
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
               <TrendingUp className="w-3.5 h-3.5 mr-2 text-emerald-500" />
               Visão Detalhada por Vertical
@@ -525,9 +803,12 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y-0">
-                  {sortedVerticals.map((v: any) => (
-                    <tr 
+                  {sortedVerticals.map((v: any, idx: number) => (
+                    <motion.tr 
                       key={v.vertical} 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.03 }}
                       onClick={() => setSelectedVertical(v.vertical)}
                       className={cn(
                         "group cursor-pointer transition-all rounded-xl",
@@ -561,7 +842,7 @@ export default function App() {
                       <td className="px-4 py-3 last:rounded-r-xl border-y border-r border-white/5 group-hover:border-white/10 text-right">
                         <span className="text-emerald-400 font-bold font-mono text-[11px]">{v.usersPerClient.toFixed(1)}</span>
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                   <tr className="bg-sky-500/10 border-t border-sky-500/20">
                     <td className="px-4 py-4 rounded-l-xl border-y border-l border-sky-500/20 font-black text-sky-400 uppercase tracking-wider">Total</td>
@@ -574,7 +855,7 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Top 20 Section */}
@@ -594,7 +875,13 @@ export default function App() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {topClients.map((client, idx) => (
-                  <tr key={idx} className="hover:bg-sky-500/5 group transition-colors">
+                  <motion.tr 
+                    key={idx}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.02 }}
+                    className="hover:bg-sky-500/5 group transition-colors"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center">
                         <span className={cn("mr-3 font-mono text-[10px] w-5 text-center", idx < 3 ? "text-amber-400 font-black" : "text-slate-600")}>{(idx + 1).toString().padStart(2, '0')}</span>
@@ -605,7 +892,7 @@ export default function App() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right"><span className="font-mono text-sky-400 font-bold">{formatCurrency(client.revenue)}</span></td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
@@ -692,14 +979,20 @@ export default function App() {
                   { label: 'Perfil Júnior', count: opStatsSummary.profiles['Júnior'], color: 'text-sky-400', bg: 'bg-sky-500/10' },
                   { label: 'Perfil Pleno', count: opStatsSummary.profiles['Pleno'], color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
                   { label: 'Perfil Sênior', count: opStatsSummary.profiles['Sênior'], color: 'text-amber-400', bg: 'bg-amber-500/10' },
-                ].map((profile) => (
-                  <div key={profile.label} className={cn("p-4 rounded-2xl border border-white/5 flex flex-col justify-center", profile.bg)}>
+                ].map((profile, idx) => (
+                  <motion.div 
+                    key={profile.label}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 + (idx * 0.05) }}
+                    className={cn("p-4 rounded-2xl border border-white/5 flex flex-col justify-center", profile.bg)}
+                  >
                     <p className="text-[9px] font-black uppercase text-slate-500 mb-2 tracking-widest">{profile.label}</p>
                     <div className="flex items-center justify-between">
                       <span className={cn("text-2xl font-black", profile.color)}>{profile.count}</span>
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Verticais</span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1166,20 +1459,7 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="flex-1 flex flex-col min-h-0"
             >
-              <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
-                <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
-                  <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-rose-400 bg-clip-text text-transparent">
-                    Organograma
-                  </h1>
-                </header>
-                <div className="flex-1 bg-slate-900/40 border border-white/10 rounded-3xl p-8 flex items-center justify-center">
-                  <div className="text-center">
-                    <BarChart3 className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-slate-400 uppercase tracking-widest">Página em Desenvolvimento</h2>
-                    <p className="text-slate-500 mt-2">A estrutura organizacional será exibida aqui.</p>
-                  </div>
-                </div>
-              </div>
+              {renderOrganograma()}
             </motion.div>
           )}
         </AnimatePresence>
