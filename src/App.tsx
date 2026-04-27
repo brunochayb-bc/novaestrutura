@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { rawSalesData, SalesClient } from './services/salesData';
 import { 
   Users, 
   TrendingUp, 
@@ -19,7 +20,8 @@ import {
   ArrowRight,
   Info,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  Briefcase
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -106,6 +108,128 @@ export default function App() {
     'Agro/Corp': false,
   });
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
+  const [execCapacity, setExecCapacity] = useState(15);
+
+  const filteredSalesData = useMemo(() => {
+    const verticals = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'];
+    const result: Record<string, { clients: SalesClient[], totalRevenue: number, headcount: number }> = {};
+
+    verticals.forEach(v => {
+      let clients = rawSalesData.filter(c => c.vertical === v);
+      if (v !== 'FINANCEIRO I') {
+        clients = clients.filter(c => c.revenue > 10000);
+      }
+      clients.sort((a, b) => b.revenue - a.revenue);
+      
+      const totalRevenue = clients.reduce((sum, c) => sum + c.revenue, 0);
+      result[v] = {
+        clients,
+        totalRevenue,
+        headcount: clients.length / execCapacity
+      };
+    });
+
+    return result;
+  }, [execCapacity]);
+
+  const salesTotals = useMemo(() => {
+    const values = Object.values(filteredSalesData) as Array<{ clients: SalesClient[], totalRevenue: number, headcount: number }>;
+    const totalClients = values.reduce((sum, v) => sum + v.clients.length, 0);
+    const totalRevenue = values.reduce((sum, v) => sum + v.totalRevenue, 0);
+    const totalHeadcount = values.reduce((sum, v) => sum + v.headcount, 0);
+    return { totalClients, totalRevenue, totalHeadcount };
+  }, [filteredSalesData]);
+
+  const renderExecutivos = () => (
+    <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+      <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+        <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+          Dimensionamento Executivos Vendas
+        </h1>
+        <div className="flex items-center space-x-6">
+          <div className="flex flex-col items-end">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Capacidade Teórica</span>
+            <div className="flex items-center space-x-3">
+              <input 
+                type="range" min="5" max="30" step="1" 
+                value={execCapacity}
+                onChange={(e) => setExecCapacity(parseInt(e.target.value))}
+                className="w-32 accent-sky-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="text-sm font-black text-white">{execCapacity} contas/head</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-4 gap-4 h-24 shrink-0">
+        {[
+          { label: 'Total de Contas', value: salesTotals.totalClients, icon: Briefcase, color: 'bg-sky-500' },
+          { label: 'Headcount Necessário', value: salesTotals.totalHeadcount.toFixed(1), icon: Users, color: 'bg-emerald-500' },
+          { label: 'Faturamento Total (Contas)', value: formatCurrency(salesTotals.totalRevenue), icon: DollarSign, color: 'bg-indigo-500' },
+          { label: 'Ticket Médio/Conta', value: formatCurrency(salesTotals.totalClients > 0 ? salesTotals.totalRevenue / salesTotals.totalClients : 0), icon: Target, color: 'bg-amber-500' },
+        ].map((stat, i) => (
+          <div key={i} className="bg-slate-950 border border-white/10 rounded-2xl p-4 flex flex-col justify-center relative overflow-hidden group shadow-xl">
+            <div className={cn("absolute right-0 top-0 w-1 h-full", stat.color)} />
+            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{stat.label}</p>
+            <p className="text-2xl font-black text-white tracking-tight">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
+        <div className="grid grid-cols-4 gap-6">
+          {(Object.entries(filteredSalesData) as Array<[string, { clients: SalesClient[], totalRevenue: number, headcount: number }]>).map(([v, data]) => (
+            <div key={v} className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col min-h-[400px]">
+              <div className="bg-slate-950/50 p-6 border-b border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-black text-white uppercase tracking-tight">{v}</h2>
+                  <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">MRR Total</p>
+                    <p className="text-sm font-black text-white">{formatCurrency(data.totalRevenue)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Sizing (HC)</p>
+                    <p className="text-sm font-black text-sky-400">{data.headcount.toFixed(1)}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4 space-y-2">
+                {data.clients.map((c, idx) => {
+                  const isKeyAccount = ['BRADESCO', 'ITAU UNIBANCO', 'SANTANDER BRASIL', 'BANCO DO BRASIL'].includes(c.name.toUpperCase());
+                  return (
+                    <div key={idx} className={cn(
+                      "border rounded-xl p-3 flex justify-between items-center group transition-colors relative",
+                      isKeyAccount 
+                        ? "bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]" 
+                        : "bg-white/5 border-white/5 hover:bg-white/10"
+                    )}>
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <span className={cn(
+                          "text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shrink-0",
+                          isKeyAccount ? "bg-amber-500/30 text-amber-400" : "bg-white/5 text-slate-500"
+                        )}>
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className={cn("text-xs font-black truncate", isKeyAccount ? "text-amber-300" : "text-white")} title={c.name}>{c.name}</p>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase">{formatNumber(c.users)} usuários</p>
+                        </div>
+                      </div>
+                      <span className={cn("text-[10px] font-mono font-black ml-2 whitespace-nowrap", isKeyAccount ? "text-amber-400" : "text-emerald-400")}>{formatCurrency(c.revenue)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   const toggleVertical = (v: Vertical) => {
     setExpandedVerticals(prev => ({ ...prev, [v]: !prev[v] }));
@@ -1032,20 +1156,7 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="flex-1 flex flex-col min-h-0"
             >
-              <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
-                <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
-                  <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-                    Executivos Vendas
-                  </h1>
-                </header>
-                <div className="flex-1 bg-slate-900/40 border border-white/10 rounded-3xl p-8 flex items-center justify-center">
-                  <div className="text-center">
-                    <Users className="w-16 h-16 text-slate-700 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-slate-400 uppercase tracking-widest">Página em Desenvolvimento</h2>
-                    <p className="text-slate-500 mt-2">O detalhamento dos executivos será exibido aqui.</p>
-                  </div>
-                </div>
-              </div>
+              {renderExecutivos()}
             </motion.div>
           ) : (
             <motion.div 
