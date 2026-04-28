@@ -28,3 +28,21 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.3);
 }
+
+@layer base {
+  input[type="range"] {
+    @apply appearance-none bg-slate-900 h-1.5 rounded-full cursor-pointer transition-all;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/20 active:scale-110 transition-transform cursor-pointer;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    @apply w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/20 active:scale-110 transition-transform cursor-pointer border-none;
+  }
+
+  input[type="range"]:focus {
+    @apply outline-none ring-2 ring-sky-500/20;
+  }
+}

@@ -34,6 +34,7 @@ export interface OperationalSettings {
   gestaoContratual: number;
   capacidadeVisitasPresenciaisMes: number;
   capacidadeContatosRemotosMes: number;
+  execCapacity: number;
 }
 
 export interface VerticalOperationalParams {

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { rawSalesData, SalesClient } from './services/salesData';
 import { 
   Users, 
@@ -83,19 +83,58 @@ export default function App() {
   });
 
   // Auth State
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ email: string; uid: string } | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+
+  const MASTER_PASSWORD = "270420262345";
+
+  // Auth Effect - Simple Local Storage session
+  useEffect(() => {
+    const savedUser = localStorage.getItem('dashboard_session');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('dashboard_session');
+      }
+    }
+    setAuthLoading(false);
+  }, []);
+
+  const handleLogin = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    setLoginError(null);
+    
+    if (password === MASTER_PASSWORD) {
+      const mockUser = { 
+        email: 'acesso@broadcast.com.br', 
+        uid: 'master-user-id' 
+      };
+      setUser(mockUser);
+      localStorage.setItem('dashboard_session', JSON.stringify(mockUser));
+      setPassword('');
+    } else {
+      setLoginError('Senha incorreta. Por favor, tente novamente.');
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('dashboard_session');
+    signOut(auth); // Still sign out from firebase just in case
+  };
 
   // Firebase Sync State
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Operational Settings State
   const initialOpSettings: Record<Vertical, OperationalSettings> = {
-    'Financeiro I': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 40 },
-    'Financeiro II': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 2, capacidadeContatosRemotosMes: 60 },
-    'Governo': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 6, capacidadeContatosRemotosMes: 20 },
-    'Agro/Corp': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 50 },
+    'Financeiro I': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 40, execCapacity: 30 },
+    'Financeiro II': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 2, capacidadeContatosRemotosMes: 60, execCapacity: 30 },
+    'Governo': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 6, capacidadeContatosRemotosMes: 20, execCapacity: 30 },
+    'Agro/Corp': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 50, execCapacity: 30 },
   };
 
   const initialParams: Record<Vertical, VerticalOperationalParams> = {
@@ -107,51 +146,7 @@ export default function App() {
 
   const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
   const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(initialParams);
-  const [execCapacity, setExecCapacity] = useState(30);
-  const [unsavedExecCapacity, setUnsavedExecCapacity] = useState(false);
   const isInitialMount = useRef(true);
-
-  // Auth Effect
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        const email = (currentUser.email || '').toLowerCase();
-        const domain = email.split('@')[1];
-        const isAuthorized = 
-          domain === 'estadao.com' || 
-          domain === 'broadcast.com.br' || 
-          email === 'bruno.chayb@gmail.com' || 
-          email === 'brunochayb@gmail.com';
-
-        if (isAuthorized) {
-          setUser(currentUser);
-          setLoginError(null);
-        } else {
-          const emailUsed = currentUser.email;
-          signOut(auth);
-          setLoginError(`O e-mail ${emailUsed} não tem permissão de acesso. Use uma conta @estadao.com, @broadcast.com.br ou e-mail autorizado.`);
-        }
-      } else {
-        setUser(null);
-      }
-      setAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async () => {
-    setLoginError(null);
-    try {
-      await signInWithGoogle();
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        // Silently handle popup closed by user
-        setLoginError(null);
-      } else {
-        setLoginError(`Erro ao entrar: ${error.message || 'Erro desconhecido'}. Tente abrir em uma nova aba para evitar restrições de segurança do iframe.`);
-      }
-    }
-  };
 
   // Firestore Loading Effect
   useEffect(() => {
@@ -160,10 +155,7 @@ export default function App() {
     const loadFirestoreData = async () => {
       setIsSyncing(true);
       try {
-        const [vData, cap] = await Promise.all([
-          verticalDataService.getAll(),
-          globalSettingsService.getExecCapacity()
-        ]);
+        const vData = await verticalDataService.getAll();
 
         if (Object.keys(vData).length > 0) {
           const newOpSettings = { ...initialOpSettings };
@@ -176,12 +168,6 @@ export default function App() {
 
           setOpSettings(newOpSettings);
           setOpParams(newOpParams);
-        }
-
-        if (cap !== null) {
-          setExecCapacity(cap);
-          setUnsavedExecCapacity(false);
-          isInitialMount.current = true; // Still considered initial after loading from DB
         }
       } catch (error) {
         console.error('Failed to load Firestore data:', error);
@@ -209,27 +195,6 @@ export default function App() {
       setIsSyncing(false);
     }
   };
-
-  const handleSaveExecCapacity = async (val: number) => {
-    if (!user) return;
-    setIsSyncing(true);
-    try {
-      await globalSettingsService.saveExecCapacity(val);
-      setUnsavedExecCapacity(false);
-    } catch (error) {
-      console.error('Failed to save exec capacity:', error);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    setUnsavedExecCapacity(true);
-  }, [execCapacity]);
 
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
 
@@ -272,9 +237,15 @@ export default function App() {
       variableHC: number
     }> = {};
 
+    const verticalMap: Record<string, Vertical> = {
+      'FINANCEIRO I': 'Financeiro I',
+      'FINANCEIRO II': 'Financeiro II',
+      'GOVERNO': 'Governo',
+      'AGRO/CORP': 'Agro/Corp'
+    };
+
     verticals.forEach(v => {
       let clients = rawSalesData.filter(c => c.vertical === v);
-      // Filter applied to all verticals based on new disclaimer
       clients = clients.filter(c => c.revenue > 10000);
       clients.sort((a, b) => b.revenue - a.revenue);
       
@@ -293,7 +264,10 @@ export default function App() {
         variableCount = clients.length - fixedHC;
       }
 
-      const variableHC = variableCount / execCapacity;
+      const vPascal = verticalMap[v];
+      const vExecCapacity = opSettings[vPascal]?.execCapacity || 30;
+
+      const variableHC = variableCount / vExecCapacity;
       const headcount = fixedHC + variableHC;
 
       result[v] = {
@@ -306,7 +280,7 @@ export default function App() {
     });
 
     return result;
-  }, [execCapacity]);
+  }, [opSettings]);
 
   const salesTotals = useMemo(() => {
     const values = Object.values(filteredSalesData) as Array<{ 
@@ -458,7 +432,15 @@ export default function App() {
     </div>
   );
 
-  const renderExecutivos = () => (
+  const renderExecutivos = () => {
+    const verticalMap: Record<string, Vertical> = {
+      'FINANCEIRO I': 'Financeiro I',
+      'FINANCEIRO II': 'Financeiro II',
+      'GOVERNO': 'Governo',
+      'AGRO/CORP': 'Agro/Corp'
+    };
+
+    return (
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
         <div className="flex flex-col">
@@ -468,38 +450,6 @@ export default function App() {
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
             A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês
           </p>
-        </div>
-        <div className="flex items-center space-x-6">
-          <div className="flex flex-col items-end">
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Capacidade Teórica</span>
-            <div className="flex items-center space-x-3">
-              <input 
-                type="range" min="5" max="30" step="1" 
-                value={execCapacity}
-                onChange={(e) => setExecCapacity(parseInt(e.target.value))}
-                className="w-32 accent-sky-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-sm font-black text-white">{execCapacity} contas/head</span>
-              <button 
-                onClick={() => handleSaveExecCapacity(execCapacity)}
-                className={cn(
-                  "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ml-4",
-                  unsavedExecCapacity
-                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
-                    : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
-                  isSyncing && "opacity-50 cursor-wait"
-                )}
-                disabled={!unsavedExecCapacity || isSyncing}
-              >
-                {isSyncing ? (
-                  <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5 mr-2" />
-                )}
-                {unsavedExecCapacity ? 'Gravar' : 'Gravado'}
-              </button>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -555,10 +505,34 @@ export default function App() {
 
             return (
               <div key={v} className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col h-fit">
-                <div className="bg-slate-950/50 p-6 border-b border-white/5 flex flex-col h-[340px]">
+                <div className="bg-slate-950/50 p-6 border-b border-white/5 flex flex-col min-h-[480px]">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-black text-white uppercase tracking-tight">{v}</h2>
-                    <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
+                    <div className="flex items-center space-x-3">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const vPascal = verticalMap[v];
+                          if (unsavedVerticals.has(vPascal) && !isSyncing) handleSave(vPascal);
+                        }}
+                        className={cn(
+                          "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
+                          unsavedVerticals.has(verticalMap[v])
+                            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
+                            : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
+                          isSyncing && "opacity-50 cursor-wait"
+                        )}
+                        disabled={isSyncing || !unsavedVerticals.has(verticalMap[v])}
+                      >
+                        {isSyncing ? (
+                          <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5 mr-2" />
+                        )}
+                        {unsavedVerticals.has(verticalMap[v]) ? 'Gravar' : 'Gravado'}
+                      </button>
+                      <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
+                    </div>
                   </div>
                   
                   <div className="space-y-6 flex-1 flex flex-col">
@@ -576,32 +550,53 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <div className="space-y-3 flex-1">
-                      {data.fixedHC > 0 ? (
-                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl h-[76px] flex flex-col justify-center">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
-                              <ShieldCheck className="w-3 h-3 mr-1" />
-                              Fixed Headcount
-                            </span>
-                            <span className="text-[11px] font-black text-amber-400">{data.fixedHC.toFixed(1)}</span>
+                    <div className="space-y-4 flex-1">
+                      <div className="space-y-3">
+                        {data.fixedHC > 0 ? (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-col justify-center">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
+                                <ShieldCheck className="w-3 h-3 mr-1" />
+                                Fixed Headcount
+                              </span>
+                              <span className="text-[11px] font-black text-amber-400">{data.fixedHC.toFixed(1)}</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight">
+                              {v === 'FINANCEIRO I' ? 'Bradesco e Itaú' : 'Banco do Brasil'} possuem HC dedicado.
+                            </p>
                           </div>
-                          <p className="text-[9px] text-slate-500 font-medium leading-tight">
-                            {v === 'FINANCEIRO I' ? 'Bradesco e Itaú' : 'Banco do Brasil'} possuem HC dedicado.
-                          </p>
+                        ) : (
+                          <div className="h-[60px] flex items-center justify-center border border-dashed border-white/5 rounded-xl opacity-20">
+                            <span className="text-[8px] font-bold uppercase text-slate-500">Sem Headcount Fixo</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 px-1 pt-1 opacity-80">
+                          <span className="flex items-center">
+                            <Users className="w-3 h-3 mr-1 opacity-50" />
+                            Contas Proporcionais ({data.clients.length - data.fixedHC})
+                          </span>
+                          <span className="text-white">{data.variableHC.toFixed(1)}</span>
                         </div>
-                      ) : (
-                        <div className="h-[76px] flex items-center justify-center border border-dashed border-white/5 rounded-xl opacity-20">
-                          <span className="text-[8px] font-bold uppercase text-slate-500">Sem Headcount Fixo</span>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5 bg-slate-900/40 p-4 rounded-2xl space-y-4">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">
+                            Capacidade de Atendimento
+                          </label>
+                          <span className="text-xs font-black text-sky-400">{opSettings[verticalMap[v]].execCapacity} contas/head</span>
                         </div>
-                      )}
-                      
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 px-1 pt-1">
-                        <span className="flex items-center">
-                          <Users className="w-3 h-3 mr-1 opacity-50" />
-                          Proporcionais ({data.clients.length - data.fixedHC})
-                        </span>
-                        <span className="text-white">{data.variableHC.toFixed(1)}</span>
+                        <input 
+                          type="range" min="1" max={data.clients.length} step="1" 
+                          value={opSettings[verticalMap[v]].execCapacity}
+                          onChange={(e) => updateOpSetting(verticalMap[v], 'execCapacity', parseInt(e.target.value))}
+                          className="w-full accent-emerald-500"
+                        />
+                        <div className="flex justify-between text-[7px] font-black text-slate-700 uppercase tracking-tighter px-0.5">
+                          <span>Alta Complexidade (1)</span>
+                          <span>Capacidade Máxima ({data.clients.length})</span>
+                        </div>
                       </div>
                     </div>
 
@@ -665,6 +660,7 @@ export default function App() {
       </div>
     </div>
   );
+  };
 
   const toggleVertical = (v: Vertical) => {
     setExpandedVerticals(prev => ({ ...prev, [v]: !prev[v] }));
@@ -672,15 +668,6 @@ export default function App() {
 
   const toggleSalesVertical = (v: string) => {
     setExpandedSalesVerticals(prev => ({ ...prev, [v]: !prev[v] }));
-  };
-
-  const handleSave_Local = (vertical: Vertical) => {
-    setUnsavedVerticals(prev => {
-      const next = new Set(prev);
-      next.delete(vertical);
-      return next;
-    });
-    // Here logic to save to a database would be implemented
   };
 
   const requestSort = (key: string) => {
@@ -1311,7 +1298,7 @@ export default function App() {
                                 step="1"
                                 value={(opSettings[v] as any)[item.key]}
                                 onChange={(e) => updateOpSetting(v, item.key as any, parseInt(e.target.value))}
-                                className="w-full accent-sky-500 h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                                className="w-full accent-sky-500 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
                               />
                               <div className="flex justify-between mt-2 text-[8px] text-slate-700 font-bold px-0">
                                 <span className="w-0 flex justify-start whitespace-nowrap">BAIXO</span>
@@ -1407,7 +1394,7 @@ export default function App() {
                             type="range" step="0.5" min="0.5" max="2" 
                             value={opParams[v].visitasAno}
                             onChange={(e) => updateOpParam(v, 'visitasAno', parseFloat(e.target.value))}
-                            className="w-full accent-sky-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                            className="w-full accent-sky-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
                           />
                           <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-0">
                             <span className="w-0 flex justify-start whitespace-nowrap">0.5</span>
@@ -1437,7 +1424,7 @@ export default function App() {
                               const snapped = snaps.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
                               updateOpParam(v, 'contatosRemotosAno', snapped);
                             }}
-                            className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer"
+                            className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
                           />
                           <div className="flex justify-between mt-2 text-[9px] text-slate-600 font-bold px-0">
                             <span className="w-0 flex justify-start whitespace-nowrap">1</span>
@@ -1574,17 +1561,19 @@ export default function App() {
                       const hc = capPerYear > 0 ? (totalDemand / capPerYear).toFixed(1) : '0.0';
 
                       return (
-                        <div className="mt-6 p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest mb-1">Headcount CS Necessário</p>
-                            <p className="text-xs text-slate-400 font-medium">
-                              Calculado com base na demanda anual total vs. capacidade individual
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-3xl font-black text-emerald-400">
-                              {hc}
-                            </p>
+                        <div className="space-y-6">
+                          <div className="mt-6 p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest mb-1">Headcount CS Necessário</p>
+                              <p className="text-xs text-slate-400 font-medium">
+                                Calculado com base na demanda anual total vs. capacidade individual
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-3xl font-black text-emerald-400">
+                                {hc}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1644,16 +1633,30 @@ export default function App() {
               Dimensionamento e Calibração Operacional para adequação de estrutura de Vendas
             </p>
 
-            <button 
-              onClick={handleLogin}
-              className="w-full flex items-center justify-center px-8 py-5 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-[0.1em] hover:bg-sky-50 transition-all duration-300 shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 group"
-            >
-              <Globe className="w-4 h-4 mr-3 text-sky-500 group-hover:rotate-12 transition-transform" />
-              Entrar com Google
-            </button>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="relative group">
+                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-sky-400 transition-colors" />
+                <input 
+                  type="password"
+                  placeholder="INSIRA A SENHA DE ACESSO"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-5 bg-slate-950/50 border border-white/5 rounded-2xl text-white font-mono text-center tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition-all placeholder:text-slate-700 placeholder:text-[10px] placeholder:font-black placeholder:tracking-[0.2em]"
+                  autoFocus
+                />
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full flex items-center justify-center px-8 py-5 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-[0.1em] hover:bg-sky-50 transition-all duration-300 shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 group"
+              >
+                <LogIn className="w-4 h-4 mr-3 text-sky-500 group-hover:translate-x-1 transition-transform" />
+                Acessar Dashboard
+              </button>
+            </form>
 
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-              Use sua conta Google @estadao.com, @broadcast.com.br ou e-mail autorizado
+              Acesso Restrito - Equipe de Vendas Broadcast
             </p>
 
             {loginError && (
@@ -1763,7 +1766,7 @@ export default function App() {
           {/* Logout Section */}
           <div className="mt-10 pt-10 border-t border-white/5">
             <button 
-              onClick={() => signOut(auth)}
+              onClick={handleLogout}
               className={cn(
                 "w-full flex items-center px-4 py-3 rounded-xl bg-slate-900 border border-white/5 text-slate-500 hover:text-white hover:border-white/10 transition-all group",
                 isSidebarCollapsed && "justify-center"
