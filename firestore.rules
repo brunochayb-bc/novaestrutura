@@ -7,6 +7,19 @@ service cloud.firestore {
     }
 
     // Helpers
+    function isAuthorized() {
+      let email = request.auth.token.email.lower();
+      let isVerified = request.auth.token.email_verified == true;
+      let domain = email.split('@')[1];
+      
+      return isVerified && (
+        domain == 'estadao.com' || 
+        domain == 'broadcast.com.br' || 
+        email == 'bruno.chayb@gmail.com' || 
+        email == 'brunochayb@gmail.com'
+      );
+    }
+
     function isValidId(id) { 
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\s]+$'); 
     }
@@ -44,22 +57,22 @@ service cloud.firestore {
 
     /**
      * RED TEAM AUDIT RESULTS:
-     * - Identity Spoofing: PASS (Checked email + email_verified)
+     * - Identity Spoofing: PASS (Strict domain/email whitelist + verified check)
      * - State Shortcutting: N/A
      * - Resource Poisoning: PASS (isValidId regex + size checks)
      * - Shadow Update: PASS (keys().size() strictly enforced)
-     * - Denial of Wallet: PASS (Ordered logic starting with auth)
+     * - Denial of Wallet: PASS (Order: Auth -> ID -> Data)
      */
     match /verticalData/{verticalId} {
-      allow read: if true;
-      allow create, update: if isValidId(verticalId) && isValidVerticalData(incoming());
-      allow delete: if false; // Prevention of full deletion
+      allow read: if isAuthorized();
+      allow create, update: if isAuthorized() && isValidId(verticalId) && isValidVerticalData(incoming());
+      allow delete: if false;
     }
 
     // Collection: Global Settings
     match /settings/global {
-      allow read: if true;
-      allow create, update: if isValidGlobalSettings(incoming());
+      allow read: if isAuthorized();
+      allow create, update: if isAuthorized() && isValidGlobalSettings(incoming());
       allow delete: if false;
     }
   }

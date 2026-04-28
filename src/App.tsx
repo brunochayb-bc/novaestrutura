@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { rawSalesData, SalesClient } from './services/salesData';
 import { 
   Users, 
@@ -23,6 +23,10 @@ import {
   ChevronLeft,
   Briefcase,
   Save,
+  LogIn,
+  LogOut,
+  ChevronDown as ChevronDownIcon,
+  Globe
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -40,6 +44,24 @@ import { cn, formatCurrency, formatNumber } from './lib/utils';
 import { Vertical, OperationalSettings, VerticalOperationalParams } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { verticalDataService, globalSettingsService } from './services/firebaseService';
+import { auth, signInWithGoogle } from './lib/firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+
+const InfoTooltip = ({ text }: { text: string }) => (
+  <span className="group relative inline-block ml-1.5 align-middle">
+    <Info className="w-3 h-3 text-slate-500 cursor-help transition-colors group-hover:text-sky-400 opacity-60 group-hover:opacity-100" />
+    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+      <motion.span 
+        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="bg-slate-950 text-white text-[10px] py-1.5 px-3 rounded-lg border border-white/10 shadow-2xl whitespace-nowrap font-bold uppercase tracking-tight block"
+      >
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-0.5 border-4 border-transparent border-t-slate-950 block" />
+      </motion.span>
+    </span>
+  </span>
+);
 
 const VERTICAL_COLORS: Record<Vertical, string> = {
   'Financeiro I': '#0ea5e9',   // Blue
@@ -59,6 +81,11 @@ export default function App() {
     key: 'totalRevenue', 
     direction: 'desc' 
   });
+
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Firebase Sync State
   const [isSyncing, setIsSyncing] = useState(false);
@@ -81,9 +108,54 @@ export default function App() {
   const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
   const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(initialParams);
   const [execCapacity, setExecCapacity] = useState(30);
+  const [unsavedExecCapacity, setUnsavedExecCapacity] = useState(false);
+  const isInitialMount = useRef(true);
+
+  // Auth Effect
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        const email = currentUser.email || '';
+        const domain = email.split('@')[1];
+        const isAuthorized = 
+          domain === 'estadao.com' || 
+          domain === 'broadcast.com.br' || 
+          email === 'bruno.chayb@gmail.com' || 
+          email === 'brunochayb@gmail.com';
+
+        if (isAuthorized) {
+          setUser(currentUser);
+          setLoginError(null);
+        } else {
+          const emailUsed = currentUser.email;
+          signOut(auth);
+          setLoginError(`O e-mail ${emailUsed} não tem permissão de acesso. Use uma conta @estadao.com, @broadcast.com.br ou e-mail autorizado.`);
+        }
+      } else {
+        setUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    setLoginError(null);
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        setLoginError('A janela de login foi fechada. Tente novamente.');
+      } else {
+        setLoginError('Ocorreu um erro ao entrar. Tente abrir em uma nova aba.');
+      }
+    }
+  };
 
   // Firestore Loading Effect
   useEffect(() => {
+    if (!user) return;
+
     const loadFirestoreData = async () => {
       setIsSyncing(true);
       try {
@@ -107,6 +179,8 @@ export default function App() {
 
         if (cap !== null) {
           setExecCapacity(cap);
+          setUnsavedExecCapacity(false);
+          isInitialMount.current = true; // Still considered initial after loading from DB
         }
       } catch (error) {
         console.error('Failed to load Firestore data:', error);
@@ -116,9 +190,10 @@ export default function App() {
     };
 
     loadFirestoreData();
-  }, []);
+  }, [user]);
 
   const handleSave = async (vertical: Vertical) => {
+    if (!user) return;
     setIsSyncing(true);
     try {
       await verticalDataService.saveVertical(vertical, opSettings[vertical], opParams[vertical]);
@@ -135,9 +210,11 @@ export default function App() {
   };
 
   const handleSaveExecCapacity = async (val: number) => {
+    if (!user) return;
     setIsSyncing(true);
     try {
       await globalSettingsService.saveExecCapacity(val);
+      setUnsavedExecCapacity(false);
     } catch (error) {
       console.error('Failed to save exec capacity:', error);
     } finally {
@@ -145,24 +222,38 @@ export default function App() {
     }
   };
 
-  const debouncedSaveExecCapacity = useCallback((val: number) => {
-    const timer = setTimeout(() => {
-      handleSaveExecCapacity(val);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
   useEffect(() => {
-    const cleanup = debouncedSaveExecCapacity(execCapacity);
-    return cleanup;
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    setUnsavedExecCapacity(true);
   }, [execCapacity]);
+
+  const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
+
+  // Debounced auto-save for operational data (Verticals)
+  useEffect(() => {
+    if (!user) return;
+    
+    const timers: NodeJS.Timeout[] = [];
+    
+    unsavedVerticals.forEach(v => {
+      const timer = setTimeout(() => {
+        handleSave(v);
+      }, 2000);
+      timers.push(timer);
+    });
+
+    return () => timers.forEach(clearTimeout);
+  }, [opSettings, opParams, user, unsavedVerticals]);
+
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
     'Financeiro I': false,
     'Financeiro II': false,
     'Governo': false,
     'Agro/Corp': false,
   });
-  const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
   const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
     'FINANCEIRO I': false,
     'FINANCEIRO II': false,
@@ -388,6 +479,24 @@ export default function App() {
                 className="w-32 accent-sky-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
               />
               <span className="text-sm font-black text-white">{execCapacity} contas/head</span>
+              <button 
+                onClick={() => handleSaveExecCapacity(execCapacity)}
+                className={cn(
+                  "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ml-4",
+                  unsavedExecCapacity
+                    ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
+                    : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
+                  isSyncing && "opacity-50 cursor-wait"
+                )}
+                disabled={!unsavedExecCapacity || isSyncing}
+              >
+                {isSyncing ? (
+                  <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5 mr-2" />
+                )}
+                {unsavedExecCapacity ? 'Gravar' : 'Gravado'}
+              </button>
             </div>
           </div>
         </div>
@@ -462,7 +571,7 @@ export default function App() {
                       </div>
                       <div className="text-right">
                         <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Total HC</p>
-                        <p className="text-base font-black text-sky-400">{data.headcount.toFixed(1)}</p>
+                        <p className="text-base font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-lg inline-block border border-emerald-500/20">{data.headcount.toFixed(1)}</p>
                       </div>
                     </div>
                     
@@ -714,10 +823,10 @@ export default function App() {
       {/* Stats Grid - High Contrast */}
       <div className="grid grid-cols-4 gap-4 h-24 shrink-0">
         {[
-          { label: 'Total de Clientes', value: formatNumber(totals.totalClients), icon: Users, sub: selectedVertical === 'Tudo' ? `${data.verticals.length} Verticais` : 'Vertical Selecionada', color: 'bg-indigo-500' },
-          { label: 'Total de usuários', value: formatNumber(totals.totalUsers), icon: Monitor, sub: `${(totals.totalUsers / totals.totalClients || 0).toFixed(1)} usuários/cliente`, color: 'bg-emerald-500' },
-          { label: 'Total', value: formatCurrency(totals.totalRevenue), icon: DollarSign, sub: 'Faturamento Mensal', accent: true, color: 'bg-sky-500' },
-          { label: 'ticket médio/cliente', value: formatCurrency(totals.averageTicket), icon: Target, color: 'bg-amber-500' },
+          { label: 'Total de Clientes', value: formatNumber(totals.totalClients), icon: Users, sub: selectedVertical === 'Tudo' ? `${data.verticals.length} Verticais` : 'Vertical Selecionada', color: 'bg-indigo-500', tooltip: 'Volume de empresas com contratos ativos' },
+          { label: 'Total de usuários', value: formatNumber(totals.totalUsers), icon: Monitor, sub: `${(totals.totalUsers / totals.totalClients || 0).toFixed(1)} usuários/cliente`, color: 'bg-emerald-500', tooltip: 'Soma de licenças distribuídas' },
+          { label: 'Total MRR', value: formatCurrency(totals.totalRevenue), icon: DollarSign, sub: 'Faturamento Mensal', accent: true, color: 'bg-sky-500', tooltip: 'Receita Mensal Recorrente projetada' },
+          { label: 'Ticket Médio', value: formatCurrency(totals.averageTicket), icon: Target, color: 'bg-amber-500', tooltip: 'Faturamento médio por conta' },
         ].map((stat, i) => (
           <motion.div 
             key={i}
@@ -731,7 +840,10 @@ export default function App() {
           >
             <div className={cn("absolute right-0 top-0 w-1.5 h-full opacity-80", stat.color)} />
             <stat.icon className="absolute right-4 top-4 w-10 h-10 text-white/[0.05] group-hover:text-white/[0.1] transition-all group-hover:rotate-12" />
-            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">{stat.label}</p>
+            <div className="flex items-center mb-1">
+              <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest leading-none">{stat.label}</p>
+              <InfoTooltip text={stat.tooltip} />
+            </div>
             <div className="flex items-baseline space-x-2">
               <p className="text-2xl font-black text-white tracking-tight drop-shadow-sm">{stat.value}</p>
             </div>
@@ -758,6 +870,7 @@ export default function App() {
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <BarChart3 className="w-3.5 h-3.5 mr-2 text-sky-500" />
                 Receita por Vertical
+                <InfoTooltip text="Visão segregada do MRR por segmento de negócio" />
               </h3>
               <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%">
@@ -790,6 +903,7 @@ export default function App() {
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <PieIcon className="w-3.5 h-3.5 mr-2 text-indigo-500" />
                 Participação de Mercado
+                <InfoTooltip text="Proporção da receita total gerada por cada pilar" />
               </h3>
               <div className="flex-1 flex items-center min-h-0">
                 <div className="w-[45%] h-full">
@@ -852,19 +966,19 @@ export default function App() {
                       <div className="flex items-center">Vertical {sortConfig.key === 'vertical' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                     <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalClients')}>
-                      <div className="flex items-center">Clientes {sortConfig.key === 'totalClients' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                      <div className="flex items-center">Clientes <InfoTooltip text="Número de contas únicas" /> {sortConfig.key === 'totalClients' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                     <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalUsers')}>
-                      <div className="flex items-center">Usuários {sortConfig.key === 'totalUsers' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                      <div className="flex items-center">Usuários <InfoTooltip text="Total de logins habilitados" /> {sortConfig.key === 'totalUsers' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                     <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('totalRevenue')}>
-                      <div className="flex items-center">Faturamento {sortConfig.key === 'totalRevenue' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                      <div className="flex items-center">Faturamento <InfoTooltip text="MRR consolidado da vertical" /> {sortConfig.key === 'totalRevenue' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                     <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => requestSort('averageTicket')}>
-                      <div className="flex items-center">Ticket Médio {sortConfig.key === 'averageTicket' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                      <div className="flex items-center">Ticket Médio <InfoTooltip text="Faturamento dividido por clientes" /> {sortConfig.key === 'averageTicket' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                     <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors text-right" onClick={() => requestSort('usersPerClient')}>
-                      <div className="flex items-center justify-end">Usuários/Cli {sortConfig.key === 'usersPerClient' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
+                      <div className="flex items-center justify-end">Usuários/Cli <InfoTooltip text="Média de penetração por conta" /> {sortConfig.key === 'usersPerClient' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />)}</div>
                     </th>
                   </tr>
                 </thead>
@@ -1031,7 +1145,10 @@ export default function App() {
 
             <div className="grid grid-cols-4 gap-8">
               <div className="col-span-1 border-r border-white/10 pr-8">
-                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Headcount Total</p>
+                <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">
+                  Headcount Total
+                  <InfoTooltip text="Projeção de força de trabalho consolidada" />
+                </div>
                 <div className="flex items-baseline space-x-2">
                   <p className="text-5xl font-black text-emerald-400 tracking-tighter">{opStatsSummary.totalHC.toFixed(1)}</p>
                 </div>
@@ -1088,11 +1205,11 @@ export default function App() {
                 <div className="flex items-center space-x-6">
                   <div className="flex space-x-8 mr-4">
                     <div className="text-center">
-                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Clientes</p>
+                      <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Clientes <InfoTooltip text="Total de contas únicas" /></div>
                       <p className="text-sm font-black text-white">{formatNumber(stats.totalClients)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Usuários</p>
+                      <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Usuários <InfoTooltip text="Faturamento dividido por clientes" /></div>
                       <p className="text-sm font-black text-white">{formatNumber(stats.totalUsers)}</p>
                     </div>
                   </div>
@@ -1139,6 +1256,7 @@ export default function App() {
                           <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                             <Settings2 className="w-4 h-4 mr-2 text-indigo-400" />
                             Calibração de Esforço
+                            <InfoTooltip text="Nível de atenção demandado pela operação" />
                           </h3>
                         </div>
 
@@ -1174,7 +1292,10 @@ export default function App() {
 
                         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                           <div className="space-y-2">
-                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Capacidade Visitas/Mês</label>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">
+                              Capacidade Visitas/Mês
+                              <InfoTooltip text="Média de visitas físicas comportada por 1 CS/mês" />
+                            </label>
                             <input 
                               type="number"
                               value={opSettings[v].capacidadeVisitasPresenciaisMes}
@@ -1183,7 +1304,10 @@ export default function App() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Capacidade Contatos/Mês</label>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">
+                              Capacidade Contatos/Mês
+                              <InfoTooltip text="Média de interações remotas comportada por 1 CS/mês" />
+                            </label>
                             <input 
                               type="number"
                               value={opSettings[v].capacidadeContatosRemotosMes}
@@ -1218,10 +1342,11 @@ export default function App() {
                 {/* Goals & Classification */}
                 <div className="space-y-8">
                   <div className="space-y-6">
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
-                      <Target className="w-4 h-4 mr-2 text-rose-400" />
-                      Metas de Cobertura Operacional
-                    </h3>
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
+                        <Target className="w-4 h-4 mr-2 text-rose-400" />
+                        Metas de Cobertura Operacional
+                        <InfoTooltip text="Frequência desejada de atendimento por usuário" />
+                      </h3>
                     
                     <div className="space-y-4">
                       <div className="space-y-3">
@@ -1285,6 +1410,7 @@ export default function App() {
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                       <Users className="w-4 h-4 mr-2 text-amber-400" />
                       Classificação da Base de Usuários
+                      <InfoTooltip text="Saúde e acessibilidade da carteira de usuários" />
                     </h3>
                     <div className="grid grid-cols-3 gap-4">
                       {[
@@ -1324,6 +1450,7 @@ export default function App() {
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center">
                       <BarChart3 className="w-4 h-4 mr-2 text-sky-400" />
                       Carteira para atuação do time de CS
+                      <InfoTooltip text="Volumetria total de atendimentos projetados/ano" />
                     </h3>
                     <div className="grid grid-cols-3 gap-4">
                       {(() => {
@@ -1420,6 +1547,79 @@ export default function App() {
     </div>
   );
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-sky-500/20 border-t-sky-500 rounded-full animate-spin mb-4" />
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Sincronizando Sessão...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+        {/* Glow Effects */}
+        <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-sky-500/10 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] bg-indigo-500/10 rounded-full blur-[120px]" />
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 w-full max-w-md text-center space-y-12"
+        >
+          {/* Logo Section */}
+          <div className="flex flex-col items-center space-y-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-sky-400 via-sky-500 to-indigo-600 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_rgba(14,165,233,0.3)] transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+              <TrendingUp className="w-12 h-12 text-white" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">
+                Dashboard Vendas
+              </h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">BROADCAST</p>
+            </div>
+          </div>
+
+          {/* Login Card */}
+          <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl space-y-8">
+            <p className="text-slate-400 text-sm font-medium leading-relaxed">
+              Dimensionamento e Calibração Operacional para adequação de estrutura de Vendas
+            </p>
+
+            <button 
+              onClick={handleLogin}
+              className="w-full flex items-center justify-center px-8 py-5 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-[0.1em] hover:bg-sky-50 transition-all duration-300 shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 group"
+            >
+              <Globe className="w-4 h-4 mr-3 text-sky-500 group-hover:rotate-12 transition-transform" />
+              Entrar
+            </button>
+
+            {loginError && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-[10px] text-rose-400 font-bold uppercase tracking-tight text-center"
+              >
+                {loginError}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Footer Branding */}
+          <div className="flex items-center justify-center space-x-6 pt-8 opacity-20 grayscale brightness-200">
+            <span className="text-[12px] font-black uppercase tracking-widest text-white">Broadcast</span>
+          </div>
+        </motion.div>
+
+        {/* Decorative Grid */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full bg-[#0f172a] text-slate-100 overflow-hidden font-sans"
          style={{ backgroundImage: 'radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%)' }}>
@@ -1427,7 +1627,7 @@ export default function App() {
       {/* Sidebar */}
       <aside className={cn(
         "flex flex-col bg-slate-950/40 border-r border-white/10 shrink-0 z-50 transition-all duration-300 relative",
-        isSidebarCollapsed ? "w-20" : "w-64"
+        isSidebarCollapsed ? "w-20" : "w-72"
       )}>
         <button 
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -1447,8 +1647,8 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="flex flex-col"
               >
-                <span className="text-xs font-black tracking-widest text-slate-500 uppercase leading-none mb-1">DashBoard</span>
-                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap">VENDAS</span>
+                <span className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase leading-none mb-1">Dashboard</span>
+                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap uppercase">Vendas</span>
               </motion.div>
             )}
           </div>
@@ -1475,7 +1675,7 @@ export default function App() {
                   currentView === item.id ? "text-sky-400" : "group-hover:text-slate-400"
                 )} />
                 {!isSidebarCollapsed && (
-                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity">{item.label}</span>
+                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap">{item.label}</span>
                 )}
                 {currentView === item.id && (
                   <motion.div 
@@ -1499,6 +1699,20 @@ export default function App() {
                 <span>Sincronizando...</span>
               </motion.div>
             )}
+          </div>
+
+          {/* Logout Section */}
+          <div className="mt-10 pt-10 border-t border-white/5">
+            <button 
+              onClick={() => signOut(auth)}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl bg-slate-900 border border-white/5 text-slate-500 hover:text-white hover:border-white/10 transition-all group",
+                isSidebarCollapsed && "justify-center"
+              )}
+            >
+              <LogOut className={cn("w-5 h-5 shrink-0 group-hover:-translate-x-1 transition-transform", !isSidebarCollapsed && "mr-4")} />
+              {!isSidebarCollapsed && <span className="text-sm font-black uppercase tracking-tighter">Sair</span>}
+            </button>
           </div>
         </div>
 
