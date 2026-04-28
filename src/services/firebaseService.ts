@@ -85,6 +85,7 @@ export const verticalDataService = {
       await setDoc(doc(db, 'verticalData', sanitizedId), {
         settings,
         params,
+        passcode: '270420262345',
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
@@ -113,6 +114,7 @@ export const globalSettingsService = {
     try {
       await setDoc(doc(db, 'settings', 'global'), {
         execCapacity: value,
+        passcode: '270420262345',
         updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch (error) {

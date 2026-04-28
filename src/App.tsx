@@ -97,13 +97,6 @@ export default function App() {
       try {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        
-        // Re-establish Firebase session silently if needed
-        import('firebase/auth').then(({ signInAnonymously }) => {
-          if (!auth.currentUser) {
-            signInAnonymously(auth).catch(err => console.error('Silent auth failed', err));
-          }
-        });
       } catch (e) {
         localStorage.removeItem('dashboard_session');
       }
@@ -116,19 +109,13 @@ export default function App() {
     setLoginError(null);
     
     if (password === MASTER_PASSWORD) {
-      try {
-        const { signInAnonymously } = await import('firebase/auth');
-        const userCredential = await signInAnonymously(auth);
-        const mockUser = { 
-          email: 'acesso@broadcast.com.br', 
-          uid: userCredential.user.uid 
-        };
-        setUser(mockUser);
-        localStorage.setItem('dashboard_session', JSON.stringify(mockUser));
-        setPassword('');
-      } catch (error: any) {
-        setLoginError(`Erro na autenticação segura: ${error.message}`);
-      }
+      const mockUser = { 
+        email: 'acesso@broadcast.com.br', 
+        uid: 'session-' + Math.random().toString(36).substr(2, 9)
+      };
+      setUser(mockUser);
+      localStorage.setItem('dashboard_session', JSON.stringify(mockUser));
+      setPassword('');
     } else {
       setLoginError('Senha incorreta. Por favor, tente novamente.');
     }
