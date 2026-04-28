@@ -26,7 +26,8 @@ import {
   LogIn,
   LogOut,
   ChevronDown as ChevronDownIcon,
-  Globe
+  Globe,
+  Zap
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -39,7 +40,7 @@ import {
   PieChart,
   Pie
 } from 'recharts';
-import { getDashboardData } from './data';
+import { getDashboardData, customers } from './data';
 import { cn, formatCurrency, formatNumber } from './lib/utils';
 import { Vertical, OperationalSettings, VerticalOperationalParams } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -70,7 +71,7 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
   'Agro/Corp': '#ef4444',      // Red/Orange focus
 };
 
-type View = 'dashboard' | 'operational' | 'executivos' | 'organograma';
+type View = 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organograma';
 
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
@@ -229,7 +230,7 @@ export default function App() {
     };
 
     verticals.forEach(v => {
-      let clients = rawSalesData.filter(c => c.vertical === v);
+      let clients = customers.filter(c => (c.vertical || '').toUpperCase().trim() === v);
       clients = clients.filter(c => c.revenue > 10000);
       clients.sort((a, b) => b.revenue - a.revenue);
       
@@ -255,7 +256,7 @@ export default function App() {
       const headcount = fixedHC + variableHC;
 
       result[v] = {
-        clients,
+        clients: clients as any, // Cast for compatibility with SalesClient type
         totalRevenue,
         headcount,
         fixedHC,
@@ -276,9 +277,8 @@ export default function App() {
     const totalRevenue = values.reduce((sum, v) => sum + v.totalRevenue, 0);
     const totalHeadcount = values.reduce((sum, v) => sum + v.headcount, 0);
     
-    // Percentages based on user provided reference: 1.422 accounts
-    // Total revenue from getDashboardData() defaults to targets sum if not calculated from raw
-    const grandTotalAccounts = 1422;
+    // Percentages based on actual dataset reference
+    const grandTotalAccounts = data.totalClients;
     const grandTotalRevenue = data.totalRevenue;
 
     const accountPercentage = (totalClients / grandTotalAccounts) * 100;
@@ -295,6 +295,244 @@ export default function App() {
     };
   }, [filteredSalesData, data.totalRevenue]);
 
+  const [expandedLowTouchVerticals, setExpandedLowTouchVerticals] = useState<Record<string, boolean>>({
+    'FINANCEIRO I': true,
+    'FINANCEIRO II': true,
+    'GOVERNO': true,
+    'AGRO/CORP': true,
+  });
+
+  const toggleLowTouchVertical = (v: string) => {
+    setExpandedLowTouchVerticals(prev => ({ ...prev, [v]: !prev[v] }));
+  };
+
+  const renderLowTouch = () => {
+    const lowTouchClients = customers
+      .filter(client => client.revenue <= 10000.01) // Handle threshold precisely
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const groupedClients: Record<string, any[]> = {
+      'FINANCEIRO I': [],
+      'FINANCEIRO II': [],
+      'GOVERNO': [],
+      'AGRO/CORP': []
+    };
+
+    lowTouchClients.forEach(client => {
+      const v = (client.vertical || '').toUpperCase().trim();
+      if (groupedClients[v]) {
+        groupedClients[v].push(client);
+      }
+    });
+
+    const verticalOrder = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'];
+
+    const totalLowTouchRevenue = lowTouchClients.reduce((acc, c) => acc + c.revenue, 0);
+    const totalLowTouchUsers = lowTouchClients.reduce((acc, c) => acc + c.users, 0);
+
+    return (
+      <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
+        <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-6 shrink-0 shadow-2xl">
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+              Carteira Low-Touch (MRR {'\u2264'} R$ 10k)
+            </h1>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+              {formatNumber(lowTouchClients.length)} Clientes identificados com MRR abaixo de R$ 10.000,00
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => {
+                const allExpanded = Object.values(expandedLowTouchVerticals).every(v => v);
+                const newState = { ...expandedLowTouchVerticals };
+                Object.keys(newState).forEach(k => newState[k] = !allExpanded);
+                setExpandedLowTouchVerticals(newState);
+              }}
+              className="bg-slate-800/50 hover:bg-slate-800 px-4 py-2 rounded-xl border border-white/5 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center"
+            >
+              {Object.values(expandedLowTouchVerticals).every(v => v) ? (
+                <>
+                  <ChevronUp className="w-3 h-3 mr-2" />
+                  Recolher Tudo
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3 mr-2" />
+                  Expandir Tudo
+                </>
+              )}
+            </button>
+            <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-white/5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase block leading-none mb-1">Total Clientes</span>
+              <span className="text-xl font-black text-white">{formatNumber(lowTouchClients.length)}</span>
+            </div>
+            <div className="bg-slate-900/50 px-4 py-2 rounded-xl border border-white/5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase block leading-none mb-1">Total MRR</span>
+              <span className="text-xl font-black text-emerald-400">{formatCurrency(totalLowTouchRevenue)}</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-6 scroll-smooth">
+          <div className="grid grid-cols-1 gap-6">
+            {verticalOrder.map(vName => {
+              const clients = groupedClients[vName] || [];
+              if (clients.length === 0) return null;
+              const isExpanded = expandedLowTouchVerticals[vName];
+
+              return (
+                <motion.div 
+                  key={vName} 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col shadow-xl"
+                >
+                  <button 
+                    onClick={() => toggleLowTouchVertical(vName)}
+                    className="bg-slate-950/50 p-6 border-b border-white/5 flex items-center justify-between w-full hover:bg-slate-950/70 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-sky-400" />
+                      </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-black text-white uppercase tracking-tight">{vName}</h2>
+                        <div className="flex items-center space-x-3 mt-0.5">
+                          <p className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">{clients.length} Contas</p>
+                          <span className="text-slate-700 font-black text-[10px]">•</span>
+                          <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{formatCurrency(clients.reduce((acc, c) => acc + c.revenue, 0))}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 group-hover:border-white/10 transition-colors">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isExpanded ? 'Recolher' : 'Expandir'}</span>
+                      <div className={cn("transition-transform duration-300", isExpanded && "rotate-180")}>
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-0 overflow-x-auto">
+                          <table className="w-full text-left border-collapse min-w-[700px]">
+                            <thead>
+                              <tr className="bg-slate-950/30">
+                                <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 w-12 text-center">#</th>
+                                <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5">Cliente</th>
+                                <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 text-right text-sky-400">MRR</th>
+                                <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 text-right">Usuários</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {clients.map((client, idx) => (
+                                <tr key={idx} className="group hover:bg-white/[0.02] transition-colors">
+                                  <td className="px-6 py-3 border-b border-white/5 text-center text-[10px] font-black text-slate-600">
+                                    {idx + 1}
+                                  </td>
+                                  <td className="px-6 py-3 border-b border-white/5">
+                                    <span className="text-xs font-black text-white uppercase group-hover:text-sky-400 transition-colors block truncate max-w-md">
+                                      {client.name}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-3 border-b border-white/5 text-right font-mono text-xs font-bold text-slate-300">
+                                    {formatCurrency(client.revenue)}
+                                  </td>
+                                  <td className="px-6 py-3 border-b border-white/5 text-right font-mono text-xs font-bold text-slate-400">
+                                    {formatNumber(client.users)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          <motion.footer 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-12 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]"
+          >
+            <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none rotate-12">
+              <BarChart3 className="w-80 h-80 text-white" />
+            </div>
+            
+            <div className="relative z-10">
+              <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-10">
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                      <TrendingUp className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Consolidado Low-Touch</h3>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] max-w-md ml-1">
+                    Métricas agregadas de todas as verticais para a categoria comercial complementar.
+                  </p>
+                </div>
+                
+                <div className="flex items-center bg-slate-950/80 rounded-2xl border border-white/5 p-2 px-6 shadow-xl">
+                  <div className="flex flex-col border-r border-white/5 pr-8 py-2">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Ticket Médio Low</span>
+                    <span className="text-xl font-black text-white text-center">
+                      {formatCurrency(lowTouchClients.length > 0 ? totalLowTouchRevenue / lowTouchClients.length : 0)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col pl-8 py-2">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Usuários / Cliente</span>
+                    <span className="text-xl font-black text-white text-center">
+                      {(lowTouchClients.length > 0 ? totalLowTouchUsers / lowTouchClients.length : 0).toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-sky-500/30 transition-colors">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Contas Totais</span>
+                  <span className="text-5xl font-black text-white group-hover:text-sky-400 transition-colors">{formatNumber(lowTouchClients.length)}</span>
+                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
+                    <div className="h-full bg-sky-500 w-full opacity-50" />
+                  </div>
+                </div>
+                
+                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-indigo-500/30 transition-colors">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Base de Usuários</span>
+                  <span className="text-5xl font-black text-white group-hover:text-indigo-400 transition-colors">{formatNumber(totalLowTouchUsers)}</span>
+                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
+                    <div className="h-full bg-indigo-500 w-full opacity-50" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-emerald-500/30 transition-colors md:col-span-2 lg:col-span-1">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">MRR Consolidado</span>
+                  <span className="text-5xl font-black text-emerald-400 group-hover:scale-105 transition-transform">{formatCurrency(totalLowTouchRevenue)}</span>
+                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-full opacity-50" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.footer>
+        </div>
+      </div>
+    );
+  };
+
   const renderOrganograma = () => (
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
@@ -303,7 +541,7 @@ export default function App() {
         </h1>
       </header>
 
-      <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-12 overflow-auto custom-scrollbar relative">
+      <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-12 overflow-auto custom-scrollbar relative scroll-smooth">
         <div className="min-w-[1000px] flex flex-col items-center space-y-16">
           
           {/* Top Level: Diretor Comercial */}
@@ -349,6 +587,11 @@ export default function App() {
                       <div className="bg-slate-900 rounded-[11px] px-6 py-4 text-center min-w-[180px]">
                         <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{v.isCS ? 'Unidade' : 'Vertical'}</p>
                         <h4 className="text-sm font-black text-white uppercase truncate">{v.name}</h4>
+                        {!v.isCS && (
+                          <p className="text-[10px] font-black text-slate-400 mt-1">
+                            {formatNumber(data.verticals.find(vs => vs.vertical === v.name)?.totalClients || 0)} CONTAS
+                          </p>
+                        )}
                         {v.isCS && (
                           <div className="mt-2 pt-2 border-t border-white/5">
                             <p className="text-[8px] text-indigo-400 font-bold uppercase leading-none">Direcionamento Funcional</p>
@@ -476,7 +719,7 @@ export default function App() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
+      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10 scroll-smooth">
         <div className="grid grid-cols-4 gap-6 items-start">
           {(Object.entries(filteredSalesData) as Array<[string, { 
             clients: SalesClient[], 
@@ -611,7 +854,7 @@ export default function App() {
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
                       className="overflow-hidden bg-slate-950/30 border-t border-white/5"
                     >
-                      <div className="p-4 space-y-2 h-full overflow-auto custom-scrollbar">
+                      <div className="p-4 space-y-2 h-full overflow-auto custom-scrollbar scroll-smooth">
                         {data.clients.map((c, idx) => {
                           const isKeyAccount = ['BRADESCO', 'ITAU UNIBANCO', 'SANTANDER BRASIL', 'BANCO DO BRASIL'].includes(c.name.toUpperCase());
                           return (
@@ -964,7 +1207,7 @@ export default function App() {
               <TrendingUp className="w-3.5 h-3.5 mr-2 text-emerald-500" />
               Visão Detalhada por Vertical
             </h3>
-            <div className="flex-1 overflow-auto custom-scrollbar">
+            <div className="flex-1 overflow-auto custom-scrollbar scroll-smooth">
               <table className="w-full text-xs text-left border-separate border-spacing-y-1">
                 <thead className="text-slate-500 font-bold uppercase text-[9px] tracking-widest sticky top-0 bg-slate-900/90 backdrop-blur z-20">
                   <tr>
@@ -1051,7 +1294,7 @@ export default function App() {
             <h3 className="text-sm font-black text-white flex items-center uppercase tracking-wider">Top 20 Clientes {selectedVertical !== 'Tudo' ? `- ${selectedVertical}` : ''}</h3>
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Ordenado por Volume (MRR)</p>
           </div>
-          <div className="flex-1 overflow-auto custom-scrollbar">
+          <div className="flex-1 overflow-auto custom-scrollbar scroll-smooth">
             <table className="w-full text-[11px] text-left border-collapse">
               <thead className="bg-[#0f172a]/95 backdrop-blur-md sticky top-0 z-20">
                 <tr className="text-slate-500 font-black uppercase text-[9px] tracking-widest border-b border-white/5">
@@ -1132,7 +1375,7 @@ export default function App() {
         </h1>
       </header>
 
-      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10">
+      <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10 scroll-smooth">
         {/* Visão Geral Section */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -1703,34 +1946,45 @@ export default function App() {
             )}
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 relative">
             {[
               { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
               { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
               { id: 'executivos', label: 'Executivos Vendas', icon: Users },
+              { id: 'low_touch', label: 'Clientes Low-touch', icon: Zap },
               { id: 'organograma', label: 'Organograma', icon: BarChart3 },
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id as View)}
                 className={cn(
-                  "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative",
+                  "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
                   currentView === item.id 
-                    ? "bg-white/10 text-white shadow-lg shadow-black/20" 
+                    ? "text-white" 
                     : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                 )}
               >
+                {currentView === item.id && (
+                  <motion.div 
+                    layoutId="activeNavBg"
+                    className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                    transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                  />
+                )}
+                
                 <item.icon className={cn(
-                  "w-5 h-5 mr-4 transition-all duration-200 shrink-0",
+                  "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
                   currentView === item.id ? "text-sky-400" : "group-hover:text-slate-400"
                 )} />
                 {!isSidebarCollapsed && (
-                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap">{item.label}</span>
+                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">{item.label}</span>
                 )}
+                
                 {currentView === item.id && (
                   <motion.div 
-                    layoutId="activeTab"
-                    className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full"
+                    layoutId="activeNavStripe"
+                    className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
               </button>
@@ -1772,14 +2026,15 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 p-6 relative">
+      <main className="flex-1 flex flex-col min-w-0 p-6 relative overflow-y-auto scroll-smooth">
         <AnimatePresence mode="wait">
           {currentView === 'dashboard' ? (
             <motion.div 
               key="dashboard"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex-1 flex flex-col min-h-0"
             >
               {renderDashboard()}
@@ -1787,9 +2042,10 @@ export default function App() {
           ) : currentView === 'operational' ? (
             <motion.div 
               key="operational"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex-1 flex flex-col min-h-0"
             >
               {renderOperational()}
@@ -1797,19 +2053,32 @@ export default function App() {
           ) : currentView === 'executivos' ? (
             <motion.div 
               key="executivos"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex-1 flex flex-col min-h-0"
             >
               {renderExecutivos()}
             </motion.div>
+          ) : currentView === 'low_touch' ? (
+            <motion.div 
+              key="low_touch"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderLowTouch()}
+            </motion.div>
           ) : (
             <motion.div 
               key="organograma"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex-1 flex flex-col min-h-0"
             >
               {renderOrganograma()}
