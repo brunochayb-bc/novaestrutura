@@ -198,22 +198,6 @@ export default function App() {
 
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
 
-  // Debounced auto-save for operational data (Verticals)
-  useEffect(() => {
-    if (!user) return;
-    
-    const timers: NodeJS.Timeout[] = [];
-    
-    unsavedVerticals.forEach(v => {
-      const timer = setTimeout(() => {
-        handleSave(v);
-      }, 2000);
-      timers.push(timer);
-    });
-
-    return () => timers.forEach(clearTimeout);
-  }, [opSettings, opParams, user, unsavedVerticals]);
-
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
     'Financeiro I': false,
     'Financeiro II': false,
@@ -513,16 +497,17 @@ export default function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           const vPascal = verticalMap[v];
-                          if (unsavedVerticals.has(vPascal) && !isSyncing) handleSave(vPascal);
+                          const hasErrors = Object.keys(validationErrors).some(key => key.startsWith(vPascal));
+                          if (unsavedVerticals.has(vPascal) && !isSyncing && !hasErrors) handleSave(vPascal);
                         }}
                         className={cn(
                           "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
-                          unsavedVerticals.has(verticalMap[v])
+                          unsavedVerticals.has(verticalMap[v]) && !Object.keys(validationErrors).some(key => key.startsWith(verticalMap[v]))
                             ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
                             : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
                           isSyncing && "opacity-50 cursor-wait"
                         )}
-                        disabled={isSyncing || !unsavedVerticals.has(verticalMap[v])}
+                        disabled={isSyncing || !unsavedVerticals.has(verticalMap[v]) || Object.keys(validationErrors).some(key => key.startsWith(verticalMap[v]))}
                       >
                         {isSyncing ? (
                           <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
