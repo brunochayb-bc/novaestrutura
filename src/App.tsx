@@ -95,7 +95,15 @@ export default function App() {
     const savedUser = localStorage.getItem('dashboard_session');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        
+        // Re-establish Firebase session silently if needed
+        import('firebase/auth').then(({ signInAnonymously }) => {
+          if (!auth.currentUser) {
+            signInAnonymously(auth).catch(err => console.error('Silent auth failed', err));
+          }
+        });
       } catch (e) {
         localStorage.removeItem('dashboard_session');
       }
@@ -108,13 +116,19 @@ export default function App() {
     setLoginError(null);
     
     if (password === MASTER_PASSWORD) {
-      const mockUser = { 
-        email: 'acesso@broadcast.com.br', 
-        uid: 'master-user-id' 
-      };
-      setUser(mockUser);
-      localStorage.setItem('dashboard_session', JSON.stringify(mockUser));
-      setPassword('');
+      try {
+        const { signInAnonymously } = await import('firebase/auth');
+        const userCredential = await signInAnonymously(auth);
+        const mockUser = { 
+          email: 'acesso@broadcast.com.br', 
+          uid: userCredential.user.uid 
+        };
+        setUser(mockUser);
+        localStorage.setItem('dashboard_session', JSON.stringify(mockUser));
+        setPassword('');
+      } catch (error: any) {
+        setLoginError(`Erro na autenticação segura: ${error.message}`);
+      }
     } else {
       setLoginError('Senha incorreta. Por favor, tente novamente.');
     }
@@ -146,7 +160,6 @@ export default function App() {
 
   const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
   const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(initialParams);
-  const isInitialMount = useRef(true);
 
   // Firestore Loading Effect
   useEffect(() => {

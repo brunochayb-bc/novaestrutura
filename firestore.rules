@@ -8,16 +8,7 @@ service cloud.firestore {
 
     // Helpers
     function isAuthorized() {
-      let email = request.auth.token.email.lower();
-      let isVerified = request.auth.token.email_verified == true;
-      let domain = email.split('@')[1];
-      
-      return isVerified && (
-        domain == 'estadao.com' || 
-        domain == 'broadcast.com.br' || 
-        email == 'bruno.chayb@gmail.com' || 
-        email == 'brunochayb@gmail.com'
-      );
+      return request.auth != null;
     }
 
     function isValidId(id) { 
@@ -39,6 +30,7 @@ service cloud.firestore {
              data.settings.gestaoContratual is number &&
              data.settings.capacidadeVisitasPresenciaisMes is number &&
              data.settings.capacidadeContatosRemotosMes is number &&
+             (data.settings.keys().hasAny(['execCapacity']) ? data.settings.execCapacity is number : true) &&
              // Params Validation
              data.params.visitasAno is number &&
              data.params.contatosRemotosAno is number &&
