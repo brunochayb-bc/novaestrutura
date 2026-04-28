@@ -490,9 +490,8 @@ export default function App() {
             return (
               <div key={v} className="bg-slate-900/40 border border-white/5 rounded-3xl overflow-hidden flex flex-col h-fit">
                 <div className="bg-slate-950/50 p-6 border-b border-white/5 flex flex-col min-h-[480px]">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-black text-white uppercase tracking-tight">{v}</h2>
-                    <div className="flex items-center space-x-3">
+                  <div className="flex flex-col space-y-4 mb-6">
+                    <div className="flex justify-end">
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -516,7 +515,11 @@ export default function App() {
                         )}
                         {unsavedVerticals.has(verticalMap[v]) ? 'Gravar' : 'Gravado'}
                       </button>
-                      <span className="px-2 py-1 bg-sky-500/10 text-sky-400 rounded text-[10px] font-black">{data.clients.length} Contas</span>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-1.5 pt-4 border-t border-white/5">
+                      <h2 className="text-xl font-black text-white uppercase tracking-tight leading-none">{v}</h2>
+                      <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.15em] opacity-80">{data.clients.length} Contas em carteira</p>
                     </div>
                   </div>
                   
