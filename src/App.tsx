@@ -115,7 +115,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
-        const email = currentUser.email || '';
+        const email = (currentUser.email || '').toLowerCase();
         const domain = email.split('@')[1];
         const isAuthorized = 
           domain === 'estadao.com' || 
@@ -145,9 +145,10 @@ export default function App() {
       await signInWithGoogle();
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user') {
-        setLoginError('A janela de login foi fechada. Tente novamente.');
+        // Silently handle popup closed by user
+        setLoginError(null);
       } else {
-        setLoginError('Ocorreu um erro ao entrar. Tente abrir em uma nova aba.');
+        setLoginError(`Erro ao entrar: ${error.message || 'Erro desconhecido'}. Tente abrir em uma nova aba para evitar restrições de segurança do iframe.`);
       }
     }
   };
@@ -1648,8 +1649,12 @@ export default function App() {
               className="w-full flex items-center justify-center px-8 py-5 bg-white text-slate-950 rounded-2xl font-black uppercase text-xs tracking-[0.1em] hover:bg-sky-50 transition-all duration-300 shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 group"
             >
               <Globe className="w-4 h-4 mr-3 text-sky-500 group-hover:rotate-12 transition-transform" />
-              Entrar
+              Entrar com Google
             </button>
+
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+              Use sua conta Google @estadao.com, @broadcast.com.br ou e-mail autorizado
+            </p>
 
             {loginError && (
               <motion.div 
