@@ -58,6 +58,9 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+const sanitizeId = (id: string) => id.replace(/\//g, '___');
+const desanitizeId = (id: string) => id.replace(/___/g, '/');
+
 export const verticalDataService = {
   async getAll() {
     const path = 'verticalData';
@@ -65,7 +68,8 @@ export const verticalDataService = {
       const querySnapshot = await getDocs(collection(db, path));
       const data: Record<string, any> = {};
       querySnapshot.forEach((doc) => {
-        data[doc.id] = doc.data();
+        const originalId = desanitizeId(doc.id);
+        data[originalId] = doc.data();
       });
       return data;
     } catch (error) {
@@ -75,9 +79,10 @@ export const verticalDataService = {
   },
 
   async saveVertical(verticalId: string, settings: OperationalSettings, params: VerticalOperationalParams) {
-    const path = `verticalData/${verticalId}`;
+    const sanitizedId = sanitizeId(verticalId);
+    const path = `verticalData/${sanitizedId}`;
     try {
-      await setDoc(doc(db, 'verticalData', verticalId), {
+      await setDoc(doc(db, 'verticalData', sanitizedId), {
         settings,
         params,
         updatedAt: serverTimestamp(),

@@ -748,7 +748,27 @@ export default function App() {
     }
   }, [data, selectedVertical]);
 
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  const validateValue = (field: string, value: number): string | null => {
+    if (value < 0) return 'Mínimo 0';
+    if (['percentDesuso', 'percentRemotos', 'percentNaoAcessiveis'].includes(field)) {
+      if (value > 100) return 'Máximo 100%';
+    }
+    return null;
+  };
+
   const updateOpSetting = (vertical: Vertical, field: keyof OperationalSettings, value: number) => {
+    const error = validateValue(field, value);
+    const errorKey = `${vertical}-${field}`;
+    
+    setValidationErrors(prev => {
+      const next = { ...prev };
+      if (error) next[errorKey] = error;
+      else delete next[errorKey];
+      return next;
+    });
+
     setUnsavedVerticals(prev => new Set(prev).add(vertical));
     setOpSettings(prev => ({
       ...prev,
@@ -784,6 +804,16 @@ export default function App() {
   };
 
   const updateOpParam = (vertical: Vertical, field: keyof VerticalOperationalParams, value: number) => {
+    const error = validateValue(field, value);
+    const errorKey = `${vertical}-${field}`;
+    
+    setValidationErrors(prev => {
+      const next = { ...prev };
+      if (error) next[errorKey] = error;
+      else delete next[errorKey];
+      return next;
+    });
+
     setUnsavedVerticals(prev => new Set(prev).add(vertical));
     setOpParams(prev => ({
       ...prev,
@@ -1217,15 +1247,17 @@ export default function App() {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (unsavedVerticals.has(v) && !isSyncing) handleSave(v);
+                      const hasErrors = Object.keys(validationErrors).some(key => key.startsWith(v));
+                      if (unsavedVerticals.has(v) && !isSyncing && !hasErrors) handleSave(v);
                     }}
                     className={cn(
                       "flex items-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
-                      unsavedVerticals.has(v)
+                      unsavedVerticals.has(v) && !Object.keys(validationErrors).some(key => key.startsWith(v))
                         ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" 
                         : "bg-slate-800/50 text-slate-600 border border-white/5 cursor-not-allowed",
                       isSyncing && "opacity-50 cursor-wait"
                     )}
+                    disabled={isSyncing || Object.keys(validationErrors).some(key => key.startsWith(v))}
                   >
                     {isSyncing ? (
                       <div className="w-3.5 h-3.5 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1300,8 +1332,14 @@ export default function App() {
                               type="number"
                               value={opSettings[v].capacidadeVisitasPresenciaisMes}
                               onChange={(e) => updateOpSetting(v, 'capacidadeVisitasPresenciaisMes', parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-sky-500 transition-colors"
+                              className={cn(
+                                "w-full bg-slate-950 border rounded-xl px-4 py-2 text-sm font-bold text-white outline-none transition-colors",
+                                validationErrors[`${v}-capacidadeVisitasPresenciaisMes`] ? "border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]" : "border-white/10 focus:border-sky-500"
+                              )}
                             />
+                            {validationErrors[`${v}-capacidadeVisitasPresenciaisMes`] && (
+                              <p className="text-[8px] font-black text-rose-500 uppercase tracking-tighter mt-1">{validationErrors[`${v}-capacidadeVisitasPresenciaisMes`]}</p>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">
@@ -1312,8 +1350,14 @@ export default function App() {
                               type="number"
                               value={opSettings[v].capacidadeContatosRemotosMes}
                               onChange={(e) => updateOpSetting(v, 'capacidadeContatosRemotosMes', parseInt(e.target.value) || 0)}
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white outline-none focus:border-sky-500 transition-colors"
+                              className={cn(
+                                "w-full bg-slate-950 border rounded-xl px-4 py-2 text-sm font-bold text-white outline-none transition-colors",
+                                validationErrors[`${v}-capacidadeContatosRemotosMes`] ? "border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]" : "border-white/10 focus:border-sky-500"
+                              )}
                             />
+                            {validationErrors[`${v}-capacidadeContatosRemotosMes`] && (
+                              <p className="text-[8px] font-black text-rose-500 uppercase tracking-tighter mt-1">{validationErrors[`${v}-capacidadeContatosRemotosMes`]}</p>
+                            )}
                           </div>
                         </div>
 
@@ -1422,22 +1466,32 @@ export default function App() {
                         const absoluteValue = Math.round((percentage / 100) * stats.totalUsers);
                         
                         return (
-                          <div key={item.key} className={cn("p-4 rounded-2xl border border-white/5", item.bg)}>
+                          <div key={item.key} className={cn(
+                            "p-4 rounded-2xl border transition-all", 
+                            validationErrors[`${v}-${item.key}`] ? "border-rose-500 bg-rose-500/5 ring-1 ring-rose-500/20" : "border-white/5",
+                            item.bg
+                          )}>
                             <p className="text-[9px] font-black uppercase text-slate-400 mb-2 leading-tight h-5">{item.label}</p>
                             <div className="flex items-center space-x-2">
                               <input 
                                 type="number" 
                                 value={percentage}
-                                onChange={(e) => updateOpParam(v, item.key as any, Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                                className="bg-transparent text-xl font-black text-white w-12 outline-none"
+                                onChange={(e) => updateOpParam(v, item.key as any, parseInt(e.target.value) || 0)}
+                                className={cn(
+                                  "bg-transparent text-xl font-black w-12 outline-none",
+                                  validationErrors[`${v}-${item.key}`] ? "text-rose-400" : "text-white"
+                                )}
                               />
                               <span className="text-xs font-bold text-slate-500">%</span>
                             </div>
+                            {validationErrors[`${v}-${item.key}`] && (
+                              <p className="text-[8px] font-black text-rose-500 uppercase tracking-tighter mt-1">{validationErrors[`${v}-${item.key}`]}</p>
+                            )}
                             <p className="text-[10px] font-bold text-slate-500 mt-1">
                               {formatNumber(absoluteValue)} usuários
                             </p>
                             <div className="h-1 bg-white/10 rounded-full mt-3 overflow-hidden">
-                              <div className="h-full bg-current opacity-60" style={{ width: `${percentage}%`, color: 'inherit' }} />
+                              <div className="h-full bg-current opacity-60" style={{ width: `${Math.min(100, Math.max(0, percentage))}%`, color: 'inherit' }} />
                             </div>
                           </div>
                         );
