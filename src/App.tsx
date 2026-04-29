@@ -200,10 +200,10 @@ export default function App() {
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
 
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
-    'Financeiro I': false,
-    'Financeiro II': false,
-    'Governo': false,
-    'Agro/Corp': false,
+    'Financeiro I': true,
+    'Financeiro II': true,
+    'Governo': true,
+    'Agro/Corp': true,
   });
   const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
     'FINANCEIRO I': false,
@@ -296,10 +296,10 @@ export default function App() {
   }, [filteredSalesData, data.totalRevenue]);
 
   const [expandedLowTouchVerticals, setExpandedLowTouchVerticals] = useState<Record<string, boolean>>({
-    'FINANCEIRO I': true,
-    'FINANCEIRO II': true,
-    'GOVERNO': true,
-    'AGRO/CORP': true,
+    'FINANCEIRO I': false,
+    'FINANCEIRO II': false,
+    'GOVERNO': false,
+    'AGRO/CORP': false,
   });
 
   const toggleLowTouchVertical = (v: string) => {
