@@ -27,7 +27,10 @@ import {
   LogOut,
   ChevronDown as ChevronDownIcon,
   Globe,
-  Zap
+  Zap,
+  CheckCircle2,
+  MessageSquare,
+  Timer
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -629,6 +632,23 @@ export default function App() {
                       </>
                     )}
                   </motion.div>
+
+                  {v.isCS && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 }}
+                      className="relative flex flex-col items-center"
+                    >
+                      {/* Connection to Specialists */}
+                      <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                      
+                      <div className="bg-slate-900 border border-indigo-500/20 px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
+                        <Monitor className="w-3 h-3 text-slate-400 mx-auto mb-2" />
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Clientes Low-Touch</p>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               ))}
             </div>
@@ -644,14 +664,75 @@ export default function App() {
           </div>
 
           {/* Legend / Info */}
-          <div className="mt-12 flex items-center space-x-8 px-6 py-3 bg-slate-900/50 border border-white/5 rounded-full backdrop-blur-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-px bg-white/20" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Reporte Hierárquico</span>
+          <div className="flex items-center space-x-12">
+            <div className="flex items-center space-x-8 px-6 py-3 bg-slate-900/50 border border-white/5 rounded-full backdrop-blur-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-px bg-white/20" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Reporte Hierárquico</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-px border-t border-dashed border-white/40" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Direcionamento Funcional</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-px border-t border-dashed border-white/40" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Direcionamento Funcional</span>
+
+            <div className="flex items-center space-x-4">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">Apoio Estratégico CS</span>
+            </div>
+          </div>
+
+          {/* Matrix: Strategic Support */}
+          <div className="w-full max-w-4xl mt-12 bg-slate-900/40 border border-white/5 rounded-3xl p-8 backdrop-blur-md">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-lg font-black text-white uppercase">Matriz de Apoio Estratégico</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Interação da unidade CS com Verticais de Negócio</p>
+              </div>
+              <ShieldCheck className="w-6 h-6 text-indigo-400 opacity-50" />
+            </div>
+
+            <div className="grid grid-cols-5 gap-6">
+              <div className="col-span-1 space-y-4">
+                <div className="h-12 flex items-center">
+                  <span className="text-[10px] font-black text-slate-500 uppercase">Pilar de Apoio</span>
+                </div>
+                {[
+                  { label: 'Retenção & Churn', icon: Timer },
+                  { label: 'Expansão (Upsell)', icon: TrendingUp },
+                  { label: 'Adopção de Produto', icon: CheckCircle2 },
+                  { label: 'Voz do Cliente', icon: MessageSquare }
+                ].map(p => (
+                  <div key={p.label} className="h-16 flex items-center space-x-3 group">
+                    <p.icon className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+                    <span className="text-[11px] font-black text-white uppercase leading-tight group-hover:text-indigo-400 transition-colors">{p.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {[
+                { name: 'Financeiro I', color: 'border-sky-500/20 hover:bg-sky-500/5' },
+                { name: 'Financeiro II', color: 'border-emerald-500/20 hover:bg-emerald-500/5' },
+                { name: 'Governo', color: 'border-amber-500/20 hover:bg-amber-500/5' },
+                { name: 'Agro/Corp', color: 'border-rose-500/20 hover:bg-rose-500/5' },
+              ].map(v => (
+                <div key={v.name} className="col-span-1 space-y-4">
+                  <div className="h-12 flex items-center justify-center bg-slate-950/80 rounded-xl border border-white/5">
+                    <span className="text-[10px] font-black text-white uppercase truncate px-2">{v.name}</span>
+                  </div>
+                  {[1, 2, 3, 4].map(idx => (
+                    <div key={idx} className={cn("h-16 rounded-2xl border flex items-center justify-center transition-all group cursor-default", v.color)}>
+                      <div className="w-2 h-2 rounded-full bg-indigo-500/40 group-hover:bg-indigo-400 group-hover:scale-125 transition-all shadow-[0_0_15px_rgba(99,102,241,0)] group-hover:shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-white/5 flex justify-center text-center">
+              <p className="text-[9px] text-slate-500 italic max-w-xl font-medium">
+                * A unidade de Customer Success atua como parceira estratégica transversal, garantindo a maximização do Valor Vitalício (LTV) através de metodologias padronizadas de sucesso aplicadas às especificidades de cada vertical.
+              </p>
             </div>
           </div>
         </div>
@@ -1371,7 +1452,7 @@ export default function App() {
     <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
         <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent">
-          Customer Success
+          Dimensionamento Customer Success
         </h1>
       </header>
 
