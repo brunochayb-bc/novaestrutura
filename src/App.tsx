@@ -30,7 +30,8 @@ import {
   Zap,
   CheckCircle2,
   MessageSquare,
-  Timer
+  Timer,
+  Scale
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -79,8 +80,41 @@ type View = 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organogr
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [isSizingExpanded, setIsSizingExpanded] = useState(true);
   const [selectedVertical, setSelectedVertical] = useState<Vertical | 'Tudo'>('Tudo');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const [hcOperational, setHcOperational] = useState<string>(() => {
+    return localStorage.getItem('hc_operational') || '0';
+  });
+  const [isHcOperationalSaving, setIsHcOperationalSaving] = useState(false);
+
+  const [hcVendas, setHcVendas] = useState<string>(() => {
+    return localStorage.getItem('hc_vendas') || '0';
+  });
+  const [isHcVendasSaving, setIsHcVendasSaving] = useState(false);
+
+  const saveHcOperational = () => {
+    setIsHcOperationalSaving(true);
+    localStorage.setItem('hc_operational', hcOperational);
+    setTimeout(() => {
+      setIsHcOperationalSaving(false);
+    }, 1000);
+  };
+
+  const saveHcVendas = () => {
+    setIsHcVendasSaving(true);
+    localStorage.setItem('hc_vendas', hcVendas);
+    setTimeout(() => {
+      setIsHcVendasSaving(false);
+    }, 1000);
+  };
+
+  useEffect(() => {
+    if (currentView === 'operational' || currentView === 'executivos') {
+      setIsSizingExpanded(true);
+    }
+  }, [currentView]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ 
     key: 'totalRevenue', 
     direction: 'desc' 
@@ -203,10 +237,10 @@ export default function App() {
   const [unsavedVerticals, setUnsavedVerticals] = useState<Set<Vertical>>(new Set());
 
   const [expandedVerticals, setExpandedVerticals] = useState<Record<Vertical, boolean>>({
-    'Financeiro I': true,
-    'Financeiro II': true,
-    'Governo': true,
-    'Agro/Corp': true,
+    'Financeiro I': false,
+    'Financeiro II': false,
+    'Governo': false,
+    'Agro/Corp': false,
   });
   const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
     'FINANCEIRO I': false,
@@ -341,7 +375,9 @@ export default function App() {
               Carteira Low-Touch (MRR {'\u2264'} R$ 10k)
             </h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-              {formatNumber(lowTouchClients.length)} Clientes identificados com MRR abaixo de R$ 10.000,00
+              <span className="text-yellow-400 font-black bg-yellow-400/10 px-2 py-1 rounded-[6px] border border-yellow-400/20 inline-block">
+                {formatNumber(lowTouchClients.length)} Clientes identificados com MRR abaixo de R$ 10.000,00
+              </span>
             </p>
           </div>
           <div className="flex items-center space-x-4">
@@ -633,7 +669,7 @@ export default function App() {
                     )}
                   </motion.div>
 
-                  {v.isCS && (
+                  {v.isCS ? (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -646,6 +682,21 @@ export default function App() {
                       <div className="bg-slate-900 border border-indigo-500/20 px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
                         <Monitor className="w-3 h-3 text-slate-400 mx-auto mb-2" />
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Clientes Low-Touch</p>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 }}
+                      className="relative flex flex-col items-center"
+                    >
+                      {/* Connection to Executivo de Vendas */}
+                      <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                      
+                      <div className="bg-slate-900 border border-white/5 hover:border-slate-700/50 transition-colors px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
+                        <Users className={cn("w-3.5 h-3.5 mx-auto mb-2 opacity-50", v.iconColor)} />
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerente de Contas</p>
                       </div>
                     </motion.div>
                   )}
@@ -753,15 +804,39 @@ export default function App() {
       <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
         <div className="flex flex-col">
           <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-            Dimensionamento Executivos Vendas
+            Dimensionamento Time de Vendas
           </h1>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mt-1">
-            A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês
-          </p>
+          <div className="mt-1">
+            <span className="text-[10px] text-yellow-500 font-extrabold uppercase tracking-wide bg-yellow-500/10 px-2.5 py-1 rounded-[6px] border border-yellow-500/20 inline-block shadow-[0_2px_10px_rgba(234,179,8,0.05)]">
+              A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3 bg-slate-900/60 border border-white/10 rounded-xl px-4 py-2">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-400">Headcount Atual:</span>
+          <input
+            type="number"
+            min="0"
+            value={hcVendas}
+            onChange={(e) => setHcVendas(e.target.value)}
+            className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+          />
+          <button
+            onClick={saveHcVendas}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              isHcVendasSaving
+                ? "bg-sky-500 text-white shadow-lg shadow-sky-500/20"
+                : "bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 active:scale-95"
+            )}
+          >
+            {isHcVendasSaving ? 'Salvo!' : 'Salvar'}
+          </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-4 h-28 shrink-0">
+      <div className="grid grid-cols-4 gap-4 shrink-0">
         {[
           { 
             label: 'Aderência Contas (Top)', 
@@ -773,7 +848,26 @@ export default function App() {
             label: 'Headcount Necessário', 
             value: salesTotals.totalHeadcount.toFixed(1), 
             sub: 'Sizing total consolidado',
-            icon: Users, color: 'text-emerald-400', barColor: 'bg-emerald-500' 
+            icon: Users, color: 'text-emerald-400', barColor: 'bg-emerald-500',
+            extra: (() => {
+              const actualSalesHC = parseFloat(hcVendas || '0');
+              const gapSales = salesTotals.totalHeadcount - actualSalesHC;
+              return (
+                <div className="mt-2.5 pt-2 border-t border-white/5 flex flex-col">
+                  <span className="text-[8px] font-black uppercase text-slate-500 tracking-widest">GAP (vs Atual {actualSalesHC.toFixed(1)}):</span>
+                  <span className={cn(
+                    "text-[10px] font-black uppercase tracking-wider mt-1 px-2 py-0.5 rounded border inline-block w-fit font-mono",
+                    gapSales > 0 
+                      ? "bg-amber-400/10 text-amber-400 border-amber-400/20" 
+                      : gapSales < 0 
+                      ? "bg-sky-400/10 text-sky-400 border-sky-400/20" 
+                      : "bg-slate-800 text-slate-400 border-white/5"
+                  )}>
+                    {gapSales > 0 ? `+${gapSales.toFixed(1)} necessário` : gapSales < 0 ? `${gapSales.toFixed(1)} excedente` : '0.0 (Alinhado)'}
+                  </span>
+                </div>
+              );
+            })()
           },
           { 
             label: 'Aderência Receita', 
@@ -796,6 +890,7 @@ export default function App() {
             </div>
             <p className={cn("text-3xl font-black tracking-tight leading-none mb-1", stat.color)}>{stat.value}</p>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{stat.sub}</p>
+            {'extra' in stat && stat.extra}
           </div>
         ))}
       </div>
@@ -878,8 +973,17 @@ export default function App() {
                             </p>
                           </div>
                         ) : (
-                          <div className="h-[60px] flex items-center justify-center border border-dashed border-white/5 rounded-xl opacity-20">
-                            <span className="text-[8px] font-bold uppercase text-slate-500">Sem Headcount Fixo</span>
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-col justify-center">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
+                                <ShieldCheck className="w-3 h-3 mr-1" />
+                                Fixed Headcount
+                              </span>
+                              <span className="text-[11px] font-black text-amber-400">0.0</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-tight">
+                              Não há headcount fixo, apenas proporcional ao atendimento das contas.
+                            </p>
                           </div>
                         )}
                         
@@ -1454,6 +1558,28 @@ export default function App() {
         <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-emerald-400 to-sky-400 bg-clip-text text-transparent">
           Dimensionamento Customer Success
         </h1>
+
+        <div className="flex items-center space-x-3 bg-slate-900/60 border border-white/10 rounded-xl px-4 py-2">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-400">Headcount Atual:</span>
+          <input
+            type="number"
+            min="0"
+            value={hcOperational}
+            onChange={(e) => setHcOperational(e.target.value)}
+            className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+          />
+          <button
+            onClick={saveHcOperational}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              isHcOperationalSaving
+                ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                : "bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 active:scale-95"
+            )}
+          >
+            {isHcOperationalSaving ? 'Salvo!' : 'Salvar'}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto custom-scrollbar space-y-6 pb-10 scroll-smooth">
@@ -1476,13 +1602,40 @@ export default function App() {
             <div className="grid grid-cols-4 gap-8">
               <div className="col-span-1 border-r border-white/10 pr-8">
                 <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">
-                  Headcount Total
+                  Headcount Total Necessário
                   <InfoTooltip text="Projeção de força de trabalho consolidada" />
                 </div>
                 <div className="flex items-baseline space-x-2">
                   <p className="text-5xl font-black text-emerald-400 tracking-tighter">{opStatsSummary.totalHC.toFixed(1)}</p>
                 </div>
-                <p className="text-[10px] text-slate-500 font-medium mt-2 leading-relaxed">
+
+                {/* Highlighted GAP for Customer Success */}
+                {(() => {
+                  const actualCSHC = parseFloat(hcOperational || '0');
+                  const gapCS = opStatsSummary.totalHC - actualCSHC;
+                  return (
+                    <div className="mt-3">
+                      <div className={cn(
+                        "px-3 py-2 rounded-xl border flex flex-col",
+                        gapCS > 0 
+                          ? "bg-amber-400/10 border-amber-400/20" 
+                          : gapCS < 0 
+                          ? "bg-sky-400/10 border-sky-400/20" 
+                          : "bg-slate-800/50 border-white/5"
+                      )}>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">GAP (vs Atual {actualCSHC.toFixed(1)}):</span>
+                        <span className={cn(
+                          "text-xs font-black font-mono mt-0.5",
+                          gapCS > 0 ? "text-amber-400" : gapCS < 0 ? "text-sky-400" : "text-slate-400"
+                        )}>
+                          {gapCS > 0 ? `+${gapCS.toFixed(1)} necessário` : gapCS < 0 ? `${gapCS.toFixed(1)} excedente` : '0.0 (Alinhado)'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <p className="text-[9px] text-slate-500 font-medium mt-3 leading-relaxed">
                   Soma do headcount necessário across todas as verticais.
                 </p>
               </div>
@@ -2028,10 +2181,117 @@ export default function App() {
           </div>
 
           <nav className="space-y-1 relative">
+            {/* Visão Geral (Dashboard) */}
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'dashboard'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'dashboard' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <LayoutDashboard className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'dashboard' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Visão Geral</span>
+              )}
+              {currentView === 'dashboard' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+
+            {/* SIZING Accordion */}
+            <div className="space-y-1">
+              <button
+                onClick={() => setIsSizingExpanded(!isSizingExpanded)}
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                  (currentView === 'operational' || currentView === 'executivos')
+                    ? "text-slate-200 bg-white/5"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                )}
+              >
+                <div className="flex items-center">
+                  <Scale className={cn(
+                    "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                    (currentView === 'operational' || currentView === 'executivos')
+                      ? "text-sky-400"
+                      : "group-hover:text-slate-400"
+                  )} />
+                  {!isSidebarCollapsed && (
+                    <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Sizing</span>
+                  )}
+                </div>
+                {!isSidebarCollapsed && (
+                  <ChevronDown className={cn(
+                    "w-4 h-4 transition-transform duration-300 text-slate-500 group-hover:text-slate-300 z-10",
+                    isSizingExpanded ? "rotate-180" : ""
+                  )} />
+                )}
+              </button>
+
+              {/* Sub-items */}
+              {isSizingExpanded && (
+                <div className={cn("space-y-1 relative", !isSidebarCollapsed && "pl-4 ml-6 border-l border-white/10")}>
+                  {[
+                    { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
+                    { id: 'executivos', label: 'Time de Vendas (EV/GC)', icon: Users },
+                  ].map((subItem) => (
+                    <button
+                      key={subItem.id}
+                      onClick={() => setCurrentView(subItem.id as View)}
+                      className={cn(
+                        "w-full flex items-center px-4 py-2.5 rounded-xl transition-all duration-300 group relative",
+                        currentView === subItem.id 
+                          ? "text-white" 
+                          : "text-slate-300 hover:text-slate-100 hover:bg-white/5"
+                      )}
+                    >
+                      {currentView === subItem.id && (
+                        <motion.div 
+                          layoutId="activeNavBg"
+                          className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                          transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                        />
+                      )}
+                      
+                      <subItem.icon className={cn(
+                        "w-4 h-4 mr-3 transition-all duration-300 shrink-0 z-10",
+                        currentView === subItem.id ? "text-sky-400" : "group-hover:text-slate-200"
+                      )} />
+                      {!isSidebarCollapsed && (
+                        <span className="text-xs font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">{subItem.label}</span>
+                      )}
+                      
+                      {currentView === subItem.id && (
+                        <motion.div 
+                          layoutId="activeNavStripe"
+                          className="absolute left-0 w-1 h-5 bg-sky-400 rounded-r-full z-10"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Clientes Low-touch and Organograma */}
             {[
-              { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
-              { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
-              { id: 'executivos', label: 'Executivos Vendas', icon: Users },
               { id: 'low_touch', label: 'Clientes Low-touch', icon: Zap },
               { id: 'organograma', label: 'Organograma', icon: BarChart3 },
             ].map((item) => (
