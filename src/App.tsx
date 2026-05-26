@@ -94,20 +94,36 @@ export default function App() {
   });
   const [isHcVendasSaving, setIsHcVendasSaving] = useState(false);
 
-  const saveHcOperational = () => {
+  const saveHcOperational = async () => {
     setIsHcOperationalSaving(true);
     localStorage.setItem('hc_operational', hcOperational);
-    setTimeout(() => {
-      setIsHcOperationalSaving(false);
-    }, 1000);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ hc_operational: hcOperational });
+      }
+    } catch (err) {
+      console.error('Error saving hc_operational to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsHcOperationalSaving(false);
+      }, 1000);
+    }
   };
 
-  const saveHcVendas = () => {
+  const saveHcVendas = async () => {
     setIsHcVendasSaving(true);
     localStorage.setItem('hc_vendas', hcVendas);
-    setTimeout(() => {
-      setIsHcVendasSaving(false);
-    }, 1000);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ hc_vendas: hcVendas });
+      }
+    } catch (err) {
+      console.error('Error saving hc_vendas to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsHcVendasSaving(false);
+      }, 1000);
+    }
   };
 
   useEffect(() => {
@@ -206,6 +222,19 @@ export default function App() {
 
           setOpSettings(newOpSettings);
           setOpParams(newOpParams);
+        }
+
+        // Load Global Configuration
+        const gSettings = await globalSettingsService.getGlobalSettings();
+        if (gSettings) {
+          if (gSettings.hc_operational !== undefined) {
+            setHcOperational(gSettings.hc_operational);
+            localStorage.setItem('hc_operational', gSettings.hc_operational);
+          }
+          if (gSettings.hc_vendas !== undefined) {
+            setHcVendas(gSettings.hc_vendas);
+            localStorage.setItem('hc_vendas', gSettings.hc_vendas);
+          }
         }
       } catch (error) {
         console.error('Failed to load Firestore data:', error);

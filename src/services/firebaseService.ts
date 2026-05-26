@@ -120,5 +120,36 @@ export const globalSettingsService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  async getGlobalSettings() {
+    const path = 'settings/global';
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'global'));
+      if (docSnap.exists()) {
+        return docSnap.data() as {
+          execCapacity?: number;
+          hc_operational?: string;
+          hc_vendas?: string;
+        };
+      }
+      return null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  async saveGlobalSettings(data: { execCapacity?: number; hc_operational?: string; hc_vendas?: string }) {
+    const path = 'settings/global';
+    try {
+      await setDoc(doc(db, 'settings', 'global'), {
+        ...data,
+        passcode: '270420262345',
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
   }
 };

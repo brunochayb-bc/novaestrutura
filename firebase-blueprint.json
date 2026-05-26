@@ -35,6 +35,8 @@
       "type": "object",
       "properties": {
         "execCapacity": { "type": "number" },
+        "hc_operational": { "type": "string" },
+        "hc_vendas": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["execCapacity", "updatedAt"]

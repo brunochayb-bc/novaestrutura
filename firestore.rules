@@ -46,11 +46,13 @@ service cloud.firestore {
 
     function isValidGlobalSettings(data) {
       return data.keys().hasAll(['execCapacity', 'updatedAt', 'passcode']) &&
-             data.keys().size() == 3 &&
+             data.keys().hasOnly(['updatedAt', 'passcode', 'execCapacity', 'hc_operational', 'hc_vendas']) &&
              data.execCapacity is number &&
              data.execCapacity > 0 &&
              data.updatedAt == request.time &&
-             data.passcode == '270420262345';
+             data.passcode == '270420262345' &&
+             (data.keys().hasAny(['hc_operational']) ? data.hc_operational is string : true) &&
+             (data.keys().hasAny(['hc_vendas']) ? data.hc_vendas is string : true);
     }
 
     /**
