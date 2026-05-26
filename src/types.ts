@@ -1,4 +1,4 @@
-export type Vertical = 'Financeiro I' | 'Financeiro II' | 'Governo' | 'Agro/Corp';
+export type Vertical = 'Financeiro I' | 'Financeiro II' | 'Governo' | 'Agro/Corp' | 'Clientes PF';
 
 export interface Customer {
   vertical: Vertical;

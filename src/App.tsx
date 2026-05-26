@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef, FormEvent } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef, FormEvent, Fragment } from 'react';
 import { rawSalesData, SalesClient } from './services/salesData';
 import { 
   Users, 
@@ -31,7 +31,9 @@ import {
   CheckCircle2,
   MessageSquare,
   Timer,
-  Scale
+  Scale,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -73,6 +75,7 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
   'Financeiro II': '#10b981',  // Green
   'Governo': '#f59e0b',        // Amber/Yellow
   'Agro/Corp': '#ef4444',      // Red/Orange focus
+  'Clientes PF': '#d946ef',    // Fuchsia
 };
 
 type View = 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organograma';
@@ -81,8 +84,50 @@ export default function App() {
   const data = useMemo(() => getDashboardData(), []);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isSizingExpanded, setIsSizingExpanded] = useState(true);
-  const [selectedVertical, setSelectedVertical] = useState<Vertical | 'Tudo'>('Tudo');
+  const [selectedVerticals, setSelectedVerticals] = useState<Vertical[]>([
+    'Financeiro I',
+    'Financeiro II',
+    'Governo',
+    'Agro/Corp',
+    'Clientes PF'
+  ]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isTopClientsVisible, setIsTopClientsVisible] = useState<boolean>(() => {
+    return localStorage.getItem('isTopClientsVisible') !== 'false';
+  });
+  const [expandedDetailVerticals, setExpandedDetailVerticals] = useState<Record<string, boolean>>({});
+
+  const toggleTopClientsVisible = () => {
+    setIsTopClientsVisible(prev => {
+      const next = !prev;
+      localStorage.setItem('isTopClientsVisible', String(next));
+      return next;
+    });
+  };
+
+  const toggleDetailVertical = (v: string) => {
+    setExpandedDetailVerticals(prev => ({
+      ...prev,
+      [v]: !prev[v]
+    }));
+  };
+
+  const isAllSelected = selectedVerticals.length === 5;
+
+  const toggleVerticalSelection = (v: Vertical) => {
+    setSelectedVerticals((prev) => {
+      if (prev.includes(v)) {
+        if (prev.length === 1) return prev; // Do not empty
+        return prev.filter((item) => item !== v);
+      } else {
+        return [...prev, v];
+      }
+    });
+  };
+
+  const selectAllVerticals = () => {
+    setSelectedVerticals(['Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp', 'Clientes PF']);
+  };
 
   const [hcOperational, setHcOperational] = useState<string>(() => {
     return localStorage.getItem('hc_operational') || '0';
@@ -190,6 +235,7 @@ export default function App() {
     'Financeiro II': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 2, capacidadeContatosRemotosMes: 60, execCapacity: 30 },
     'Governo': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 6, capacidadeContatosRemotosMes: 20, execCapacity: 30 },
     'Agro/Corp': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 4, capacidadeContatosRemotosMes: 50, execCapacity: 30 },
+    'Clientes PF': { suporteTreinamento: 1, relacionamento: 2, gestaoContratual: 1, capacidadeVisitasPresenciaisMes: 0, capacidadeContatosRemotosMes: 0, execCapacity: 30 },
   };
 
   const initialParams: Record<Vertical, VerticalOperationalParams> = {
@@ -197,6 +243,7 @@ export default function App() {
     'Financeiro II': { visitasAno: 0.5, contatosRemotosAno: 2, percentDesuso: 20, percentRemotos: 70, percentNaoAcessiveis: 10 },
     'Governo': { visitasAno: 1.5, contatosRemotosAno: 1, percentDesuso: 10, percentRemotos: 30, percentNaoAcessiveis: 20 },
     'Agro/Corp': { visitasAno: 1, contatosRemotosAno: 1.5, percentDesuso: 25, percentRemotos: 80, percentNaoAcessiveis: 15 },
+    'Clientes PF': { visitasAno: 0, contatosRemotosAno: 0, percentDesuso: 0, percentRemotos: 0, percentNaoAcessiveis: 0 },
   };
 
   const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
@@ -270,6 +317,7 @@ export default function App() {
     'Financeiro II': false,
     'Governo': false,
     'Agro/Corp': false,
+    'Clientes PF': false,
   });
   const [expandedSalesVerticals, setExpandedSalesVerticals] = useState<Record<string, boolean>>({
     'FINANCEIRO I': false,
@@ -1141,45 +1189,40 @@ export default function App() {
   }, [data, sortConfig]);
 
   const topClients = useMemo(() => {
-    const list = selectedVertical === 'Tudo' 
-      ? data.verticals.flatMap(v => v.topClients)
-      : data.verticals.find(v => v.vertical === selectedVertical)?.topClients || [];
+    const list = data.verticals
+      .filter(v => selectedVerticals.includes(v.vertical))
+      .flatMap(v => v.topClients);
     return [...list].sort((a, b) => b.revenue - a.revenue).slice(0, 20);
-  }, [data, selectedVertical]);
+  }, [data, selectedVerticals]);
 
-  const barData = useMemo(() => data.verticals.map(v => ({
-    name: v.vertical,
-    revenue: v.totalRevenue,
-    clients: v.totalClients,
-    users: v.totalUsers,
-    ticket: v.averageTicket,
-    fill: VERTICAL_COLORS[v.vertical],
-    participation: v.revenueParticipation
-  })).sort((a, b) => b.revenue - a.revenue), [data]);
+  const barData = useMemo(() => {
+    const activeVerticals = data.verticals.filter(v => selectedVerticals.includes(v.vertical));
+    const totalActiveRevenue = activeVerticals.reduce((sum, v) => sum + v.totalRevenue, 0);
+    
+    return activeVerticals.map(v => ({
+      name: v.vertical,
+      revenue: v.totalRevenue,
+      clients: v.totalClients,
+      users: v.totalUsers,
+      ticket: v.averageTicket,
+      fill: VERTICAL_COLORS[v.vertical],
+      participation: totalActiveRevenue > 0 ? (v.totalRevenue / totalActiveRevenue) * 100 : 0
+    })).sort((a, b) => b.revenue - a.revenue);
+  }, [data, selectedVerticals]);
 
   const totals = useMemo(() => {
-    if (selectedVertical === 'Tudo') {
-      const clients = data.verticals.reduce((sum, v) => sum + v.totalClients, 0);
-      const users = data.verticals.reduce((sum, v) => sum + v.totalUsers, 0);
-      const revenue = data.verticals.reduce((sum, v) => sum + v.totalRevenue, 0);
-      return {
-        totalClients: clients,
-        totalUsers: users,
-        totalRevenue: revenue,
-        averageTicket: clients > 0 ? revenue / clients : 0,
-        usersPerClient: clients > 0 ? users / clients : 0
-      };
-    } else {
-      const v = data.verticals.find(vs => vs.vertical === selectedVertical);
-      return {
-        totalClients: v?.totalClients || 0,
-        totalUsers: v?.totalUsers || 0,
-        totalRevenue: v?.totalRevenue || 0,
-        averageTicket: v?.averageTicket || 0,
-        usersPerClient: v?.usersPerClient || 0
-      };
-    }
-  }, [data, selectedVertical]);
+    const activeVerticals = data.verticals.filter(v => selectedVerticals.includes(v.vertical));
+    const clients = activeVerticals.reduce((sum, v) => sum + v.totalClients, 0);
+    const users = activeVerticals.reduce((sum, v) => sum + v.totalUsers, 0);
+    const revenue = activeVerticals.reduce((sum, v) => sum + v.totalRevenue, 0);
+    return {
+      totalClients: clients,
+      totalUsers: users,
+      totalRevenue: revenue,
+      averageTicket: clients > 0 ? revenue / clients : 0,
+      usersPerClient: clients > 0 ? users / clients : 0
+    };
+  }, [data, selectedVerticals]);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -1264,29 +1307,58 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="flex bg-slate-950/50 p-1 rounded-xl border border-white/5">
-            {['Tudo', 'Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp'].map((v) => (
+          <div className="flex bg-slate-950/50 p-1 rounded-xl border border-white/5 space-x-1">
+            <button
+              onClick={selectAllVerticals}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap border",
+                isAllSelected 
+                  ? "bg-sky-500/20 text-sky-400 border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.1)]" 
+                  : "text-slate-500 border-transparent hover:text-slate-300"
+              )}
+            >
+              Tudo
+            </button>
+            {(['Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp', 'Clientes PF'] as Vertical[]).map((v) => (
               <button
                 key={v}
-                onClick={() => setSelectedVertical(v as any)}
+                onClick={() => toggleVerticalSelection(v)}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap",
-                  selectedVertical === v 
-                    ? "bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.1)]" 
-                    : "text-slate-500 hover:text-slate-300"
+                  "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap border flex items-center",
+                  selectedVerticals.includes(v)
+                    ? "bg-slate-900 text-white border-white/10 shadow-md"
+                    : "text-slate-600 border-transparent hover:text-slate-550"
                 )}
+                style={{
+                  borderLeftColor: selectedVerticals.includes(v) ? VERTICAL_COLORS[v] : undefined,
+                  borderLeftWidth: selectedVerticals.includes(v) ? '3px' : undefined,
+                }}
               >
                 {v}
               </button>
             ))}
           </div>
+
+          <button
+            onClick={toggleTopClientsVisible}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all whitespace-nowrap border flex items-center space-x-1.5 shadow-lg",
+              isTopClientsVisible 
+                ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30 shadow-[0_0_25px_rgba(99,102,241,0.15)]" 
+                : "bg-slate-950/40 text-slate-500 border-white/5 hover:text-slate-300 hover:bg-slate-950/60"
+            )}
+            title={isTopClientsVisible ? "Ocultar classificação do Top 20" : "Exibir classificação do Top 20"}
+          >
+            {isTopClientsVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span>Top 20 Clientes</span>
+          </button>
         </div>
       </header>
 
       {/* Stats Grid - High Contrast */}
       <div className="grid grid-cols-4 gap-4 h-24 shrink-0">
         {[
-          { label: 'Total de Clientes', value: formatNumber(totals.totalClients), icon: Users, sub: selectedVertical === 'Tudo' ? `${data.verticals.length} Verticais` : 'Vertical Selecionada', color: 'bg-indigo-500', tooltip: 'Volume de empresas com contratos ativos' },
+          { label: 'Total de Clientes', value: formatNumber(totals.totalClients), icon: Users, sub: isAllSelected ? `${data.verticals.length} Verticais` : `${selectedVerticals.length} de ${data.verticals.length} Selecionadas`, color: 'bg-indigo-500', tooltip: 'Volume de empresas com contratos ativos' },
           { label: 'Total de usuários', value: formatNumber(totals.totalUsers), icon: Monitor, sub: `${(totals.totalUsers / totals.totalClients || 0).toFixed(1)} usuários/cliente`, color: 'bg-emerald-500', tooltip: 'Soma de licenças distribuídas' },
           { label: 'Total MRR', value: formatCurrency(totals.totalRevenue), icon: DollarSign, sub: 'Faturamento Mensal', accent: true, color: 'bg-sky-500', tooltip: 'Receita Mensal Recorrente projetada' },
           { label: 'Ticket Médio', value: formatCurrency(totals.averageTicket), icon: Target, color: 'bg-amber-500', tooltip: 'Faturamento médio por conta' },
@@ -1320,9 +1392,12 @@ export default function App() {
         ))}
       </div>
 
-      <div className="grid grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Charts Section */}
-        <div className="col-span-8 flex flex-col space-y-4 min-h-0">
+      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden relative">
+        {/* Main Dashboard Panel: Grows to 100% when Top 20 is collapsed */}
+        <motion.div 
+          layout
+          className="flex-1 flex flex-col space-y-4 min-h-0 min-w-0"
+        >
           <div className="grid grid-cols-2 gap-4 h-[40%] shrink-0">
             <motion.div 
               initial={{ opacity: 0, scale: 0.98 }}
@@ -1446,47 +1521,165 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y-0">
-                  {sortedVerticals.map((v: any, idx: number) => (
-                    <motion.tr 
-                      key={v.vertical} 
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      onClick={() => setSelectedVertical(v.vertical)}
-                      className={cn(
-                        "group cursor-pointer transition-all rounded-xl",
-                        selectedVertical === v.vertical ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-950/20 hover:bg-slate-950/50"
-                      )}
-                    >
-                      <td className="px-4 py-3 first:rounded-l-xl border-y border-l border-white/5 group-hover:border-white/10">
-                        <div className="flex items-center font-black text-white whitespace-nowrap">
-                          <div className="w-2 h-2 rounded-full mr-3" style={{ backgroundColor: VERTICAL_COLORS[v.vertical as Vertical] }} />
-                          {v.vertical}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalClients)}</td>
-                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalUsers)}</td>
-                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
-                        <div className="flex flex-col min-w-[120px]">
-                          <span className="font-mono text-sky-400 font-bold whitespace-nowrap">{formatCurrency(v.totalRevenue)}</span>
-                          <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${(v.totalRevenue / maxRevenue) * 100}%` }} className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
-                        <div className="flex flex-col min-w-[100px]">
-                          <span className="text-slate-300 font-semibold font-mono text-[11px] whitespace-nowrap">{formatCurrency(v.averageTicket)}</span>
-                          <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${(v.averageTicket / maxTicket) * 100}%` }} className="h-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 last:rounded-r-xl border-y border-r border-white/5 group-hover:border-white/10 text-right">
-                        <span className="text-emerald-400 font-bold font-mono text-[11px]">{v.usersPerClient.toFixed(1)}</span>
-                      </td>
-                    </motion.tr>
-                  ))}
+                  {sortedVerticals.map((v: any, idx: number) => {
+                    const isExpanded = !!expandedDetailVerticals[v.vertical];
+                    return (
+                      <Fragment key={v.vertical}>
+                        <motion.tr 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          onClick={() => toggleVerticalSelection(v.vertical)}
+                          className={cn(
+                            "group cursor-pointer transition-all rounded-xl",
+                            selectedVerticals.includes(v.vertical) 
+                              ? isExpanded 
+                                ? "bg-sky-500/15 border-sky-500/20" 
+                                : "bg-sky-500/10 border-sky-500/10" 
+                              : "bg-slate-950/5 border-transparent opacity-40 hover:opacity-75"
+                          )}
+                        >
+                          <td className="px-4 py-3 first:rounded-l-xl border-y border-l border-white/5 group-hover:border-white/10">
+                            <div className="flex items-center font-black text-white whitespace-nowrap">
+                              <div 
+                                className={cn(
+                                  "w-3.5 h-3.5 rounded border mr-3 flex items-center justify-center transition-all shrink-0",
+                                  selectedVerticals.includes(v.vertical)
+                                    ? "border-sky-500 bg-sky-500 text-slate-950"
+                                    : "border-slate-600 bg-transparent"
+                                )}
+                              >
+                                {selectedVerticals.includes(v.vertical) && (
+                                  <svg className="w-2 h-2 text-slate-950 fill-none stroke-current stroke-3" viewBox="0 0 24 24">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="w-2 h-2 rounded-full mr-2 shrink-0" style={{ backgroundColor: VERTICAL_COLORS[v.vertical as Vertical] }} />
+                              <span className="truncate mr-2 max-w-[120px]" title={v.vertical}>{v.vertical}</span>
+                              
+                              {/* Sleek expandable details trigger button */}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleDetailVertical(v.vertical);
+                                }}
+                                className={cn(
+                                  "p-1 ml-auto rounded-lg transition-all border shrink-0 flex items-center justify-center",
+                                  isExpanded
+                                    ? "bg-sky-500/25 text-sky-400 border-sky-500/40 shadow-[0_0_10px_rgba(14,165,233,0.15)]"
+                                    : "bg-white/5 text-slate-400 border-white/5 hover:bg-white/10 hover:text-white"
+                                )}
+                                title={isExpanded ? "Recolher detalhes" : "Visualizar detalhamento por vertical"}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalClients)}</td>
+                          <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10 text-slate-400 font-mono text-[11px]">{formatNumber(v.totalUsers)}</td>
+                          <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
+                            <div className="flex flex-col min-w-[120px]">
+                              <span className="font-mono text-sky-400 font-bold whitespace-nowrap">{formatCurrency(v.totalRevenue)}</span>
+                              <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                                <motion.div initial={{ width: 0 }} animate={{ width: `${(v.totalRevenue / maxRevenue) * 100}%` }} className="h-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 border-y border-white/5 group-hover:border-white/10">
+                            <div className="flex flex-col min-w-[100px]">
+                              <span className="text-slate-300 font-semibold font-mono text-[11px] whitespace-nowrap">{formatCurrency(v.averageTicket)}</span>
+                              <div className="h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                                <motion.div initial={{ width: 0 }} animate={{ width: `${(v.averageTicket / maxTicket) * 100}%` }} className="h-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 last:rounded-r-xl border-y border-r border-white/5 group-hover:border-white/10 text-right">
+                            <span className="text-emerald-400 font-bold font-mono text-[11px]">{v.usersPerClient.toFixed(1)}</span>
+                          </td>
+                        </motion.tr>
+
+                        {/* Collapsing sub-row with elegant modular metrics bento grid */}
+                        {isExpanded && (
+                          <tr className="bg-slate-950/40 border-x border-b border-white/5">
+                            <td colSpan={6} className="px-4 py-4 rounded-b-xl">
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden space-y-4"
+                              >
+                                <div className="grid grid-cols-12 gap-6 items-stretch text-left">
+                                  {/* User-size categorization */}
+                                  <div className="col-span-7 bg-slate-950/60 p-4 border border-white/5 rounded-2xl flex flex-col space-y-3 shadow-inner">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center shrink-0">
+                                      <PieIcon className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                                      Clientes por Volume de Usuários (Tamanho)
+                                    </h4>
+                                    <div className="grid grid-cols-4 gap-2 flex-1 items-center">
+                                      {[
+                                        { label: 'Grande (51+)', count: v.sizeDistribution.grande, color: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/20' },
+                                        { label: 'Médio (11-50)', count: v.sizeDistribution.medio, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+                                        { label: 'Pequeno (3-10)', count: v.sizeDistribution.pequeno, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+                                        { label: 'Micro (1-2)', count: v.sizeDistribution.micro, color: 'text-slate-400', bg: 'bg-slate-500/10 border-white/5' }
+                                      ].map((porte) => (
+                                        <div key={porte.label} className={cn("p-2.5 rounded-xl border flex flex-col justify-between items-center text-center h-full", porte.bg)}>
+                                          <span className="text-[8px] font-black uppercase tracking-tight text-slate-500 leading-tight">
+                                            {porte.label}
+                                          </span>
+                                          <span className={cn("text-lg font-black mt-1 leading-none", porte.color)}>
+                                            {porte.count}
+                                          </span>
+                                          <span className="text-[8px] font-bold text-slate-600 mt-1 uppercase font-mono">
+                                            {v.totalClients > 0 ? `${((porte.count / v.totalClients) * 100).toFixed(0)}%` : '0%'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* CS Active Settings Summary */}
+                                  <div className="col-span-5 bg-slate-950/60 p-4 border border-white/5 rounded-2xl flex flex-col space-y-3 shadow-inner justify-between">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center">
+                                      <ShieldCheck className="w-3.5 h-3.5 mr-1.5 text-sky-400" />
+                                      Atendimento de Sucesso (CS)
+                                    </h4>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <div className="p-2 rounded-xl border border-white/5 bg-slate-900/50 flex flex-col justify-center text-center">
+                                        <span className="text-[8px] font-bold text-slate-500 block uppercase">Visitas/Ano</span>
+                                        <span className="text-sm font-black text-slate-200 block mt-0.5 font-mono">
+                                          {opParams[v.vertical as Vertical]?.visitasAno ?? '0'}x
+                                        </span>
+                                      </div>
+                                      <div className="p-2 rounded-xl border border-white/5 bg-slate-900/50 flex flex-col justify-center text-center">
+                                        <span className="text-[8px] font-bold text-slate-500 block uppercase font-mono">Contatos/Ano</span>
+                                        <span className="text-sm font-black text-slate-200 block mt-0.5">
+                                          {opParams[v.vertical as Vertical]?.contatosRemotosAno ?? '0'}x
+                                        </span>
+                                      </div>
+                                      <div className="p-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 flex flex-col justify-center text-center">
+                                        <span className="text-[8px] font-bold text-indigo-400 block uppercase">Perfil</span>
+                                        <span className="text-[10px] font-black text-white block mt-0.5 truncate uppercase">
+                                          {getRecommendedProfile(opSettings[v.vertical as Vertical] || { suporteTreinamento: 0, relacionamento: 0, gestaoContratual: 0, capacidadeVisitasPresenciaisMes: 0, capacidadeContatosRemotosMes: 0, execCapacity: 0 })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <p className="text-[8.5px] text-slate-500 italic text-center uppercase tracking-tighter leading-none mt-1">
+                                      Calibração operacional vinculada à vertical
+                                    </p>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                   <tr className="bg-sky-500/10 border-t border-sky-500/20">
                     <td className="px-4 py-4 rounded-l-xl border-y border-l border-sky-500/20 font-black text-sky-400 uppercase tracking-wider">Total</td>
                     <td className="px-4 py-4 border-y border-sky-500/20 text-white font-mono font-bold">{formatNumber(totals.totalClients)}</td>
@@ -1499,48 +1692,74 @@ export default function App() {
               </table>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
 
-        {/* Top 20 Section */}
-        <div className="col-span-4 flex flex-col min-h-0 bg-slate-900/80 border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500" />
-          <div className="p-5 border-b border-white/5 flex flex-col space-y-2 bg-slate-950/20">
-            <h3 className="text-sm font-black text-white flex items-center uppercase tracking-wider">Top 20 Clientes {selectedVertical !== 'Tudo' ? `- ${selectedVertical}` : ''}</h3>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Ordenado por Volume (MRR)</p>
-          </div>
-          <div className="flex-1 overflow-auto custom-scrollbar scroll-smooth">
-            <table className="w-full text-[11px] text-left border-collapse">
-              <thead className="bg-[#0f172a]/95 backdrop-blur-md sticky top-0 z-20">
-                <tr className="text-slate-500 font-black uppercase text-[9px] tracking-widest border-b border-white/5">
-                  <th className="px-4 py-3">Ranking / Nome</th>
-                  <th className="px-4 py-3 text-right">Faturamento</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {topClients.map((client, idx) => (
-                  <motion.tr 
-                    key={idx}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.02 }}
-                    className="hover:bg-sky-500/5 group transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center">
-                        <span className={cn("mr-3 font-mono text-[10px] w-5 text-center", idx < 3 ? "text-amber-400 font-black" : "text-slate-600")}>{(idx + 1).toString().padStart(2, '0')}</span>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-slate-100 font-bold group-hover:text-white truncate max-w-[180px]" title={client.name}>{client.name}</span>
-                          <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">{client.vertical}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right"><span className="font-mono text-sky-400 font-bold">{formatCurrency(client.revenue)}</span></td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {/* Top 20 Slider Panel: Slides smoothly from right to left */}
+        <AnimatePresence>
+          {isTopClientsVisible && (
+            <motion.div
+              layout
+              initial={{ x: 400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 400, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 28 }}
+              className="w-[380px] shrink-0 flex flex-col min-h-0 bg-slate-900/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden relative"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500" />
+              <div className="p-5 border-b border-white/5 flex items-center justify-between bg-slate-950/20 shrink-0">
+                <div className="flex flex-col space-y-1">
+                  <h3 className="text-sm font-black text-white flex items-center uppercase tracking-wider">
+                    Top 20 Clientes {!isAllSelected && `(${selectedVerticals.length} Sel.)`}
+                  </h3>
+                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                    Ordenado por Volume (MRR)
+                  </p>
+                </div>
+                {/* Compact Collapse Indicator */}
+                <button
+                  onClick={toggleTopClientsVisible}
+                  className="p-1 px-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all text-[8.5px] font-bold uppercase tracking-wider flex items-center space-x-1 border border-white/5 active:scale-95"
+                  title="Recolher classificação"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                  <span>Ocultar</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto custom-scrollbar scroll-smooth">
+                <table className="w-full text-[11px] text-left border-collapse">
+                  <thead className="bg-[#0f172a]/95 backdrop-blur-md sticky top-0 z-20">
+                    <tr className="text-slate-500 font-black uppercase text-[9px] tracking-widest border-b border-white/5">
+                      <th className="px-4 py-3">Ranking / Nome</th>
+                      <th className="px-4 py-3 text-right">Faturamento</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {topClients.map((client, idx) => (
+                      <motion.tr 
+                        key={idx}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className="hover:bg-sky-500/5 group transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center">
+                            <span className={cn("mr-3 font-mono text-[10px] w-5 text-center", idx < 3 ? "text-amber-400 font-black" : "text-slate-600")}>{(idx + 1).toString().padStart(2, '0')}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-slate-100 font-bold group-hover:text-white truncate max-w-[180px]" title={client.name}>{client.name}</span>
+                              <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">{client.vertical}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right"><span className="font-mono text-sky-400 font-bold">{formatCurrency(client.revenue)}</span></td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

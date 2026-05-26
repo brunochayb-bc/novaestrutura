@@ -1,59 +1,66 @@
 import { Customer, DashboardData, Vertical } from './types';
 import { rawSalesData } from './services/salesData';
 import { fullRawCsvData } from './constants/rawCsv';
+import { rawPfCsvData } from './constants/rawPfCsv';
 
 function parseData() {
-  const baseCustomers: Customer[] = fullRawCsvData
-    .trim()
-    .split('\n')
-    .slice(1)
-    .map(line => {
-      // Skip empty lines or the totals line
-      if (!line.trim() || line.includes(',TOTAL,')) return null;
+  const parseSingleCsv = (csvStr: string) => {
+    return csvStr
+      .trim()
+      .split('\n')
+      .slice(1)
+      .map(line => {
+        // Skip empty lines or the totals line
+        if (!line.trim() || line.includes(',TOTAL,')) return null;
 
-      // Handle potential comma in quoted names
-      const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-      if (parts.length < 4) return null;
+        // Handle potential comma in quoted names
+        const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+        if (parts.length < 4) return null;
 
-      let vertical = parts[0].trim();
-      
-      // Standardize vertical names
-      const vUpper = vertical.toUpperCase();
-      if (vUpper === 'FINANCEIRO I') vertical = 'Financeiro I';
-      else if (vUpper === 'FINANCEIRO II') vertical = 'Financeiro II';
-      else if (vUpper === 'GOVERNO') vertical = 'Governo';
-      else if (vUpper === 'AGRO/CORP' || vUpper === 'AGRO') vertical = 'Agro/Corp';
+        let vertical = parts[0].trim();
+        
+        // Standardize vertical names
+        const vUpper = vertical.toUpperCase();
+        if (vUpper === 'FINANCEIRO I') vertical = 'Financeiro I';
+        else if (vUpper === 'FINANCEIRO II') vertical = 'Financeiro II';
+        else if (vUpper === 'GOVERNO') vertical = 'Governo';
+        else if (vUpper === 'AGRO/CORP' || vUpper === 'AGRO') vertical = 'Agro/Corp';
+        else if (vUpper === 'PESSOA FÍSICA' || vUpper === 'PESSOA FISICA') vertical = 'Clientes PF';
 
-      const cleanNum = (s: string) => {
-        if (!s) return 0;
-        const c = s.trim().replace(/\./g, '').replace(',', '.').replace(/-/g, '0');
-        return parseFloat(c) || 0;
-      };
+        const cleanNum = (s: string) => {
+          if (!s) return 0;
+          const c = s.trim().replace(/\./g, '').replace(',', '.').replace(/-/g, '0');
+          return parseFloat(c) || 0;
+        };
 
-      const name = parts[1].trim().replace(/^"|"$/g, '');
-      if (!name || name === 'TOTAL') return null;
+        const name = parts[1].trim().replace(/^"|"$/g, '');
+        if (!name || name === 'TOTAL') return null;
 
-      return {
-        vertical: vertical as Vertical,
-        name: name,
-        users: parseInt(parts[2].trim().replace(/\./g, '')) || 0,
-        revenue: cleanNum(parts[3]),
-        fatAe: cleanNum(parts[4]),
-        fatAeUs: cleanNum(parts[5]),
-        fatBols: cleanNum(parts[6]),
-        fatBolUs: cleanNum(parts[7]),
-      };
-    })
-    .filter((c): c is Customer => c !== null);
+        return {
+          vertical: vertical as Vertical,
+          name: name,
+          users: parseInt(parts[2].trim().replace(/\./g, '')) || 0,
+          revenue: cleanNum(parts[3]),
+          fatAe: cleanNum(parts[4]),
+          fatAeUs: cleanNum(parts[5]),
+          fatBols: cleanNum(parts[6]),
+          fatBolUs: cleanNum(parts[7]),
+        };
+      })
+      .filter((c): c is Customer => c !== null);
+  };
 
-  // Use only CSV data to ensure it reflects exactly the provided spreadsheet
-  return baseCustomers;
+  const baseCustomers = parseSingleCsv(fullRawCsvData);
+  const pfCustomers = parseSingleCsv(rawPfCsvData);
+
+  // Use only CSV data to ensure it reflects exactly the provided spreadsheets
+  return [...baseCustomers, ...pfCustomers];
 }
 
 export const customers = parseData();
 
 export function getDashboardData(): DashboardData {
-  const verticals: Vertical[] = ['Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp'];
+  const verticals: Vertical[] = ['Financeiro I', 'Financeiro II', 'Governo', 'Agro/Corp', 'Clientes PF'];
   
   const totalRevenue = customers.reduce((acc, c) => acc + c.revenue, 0);
   const totalClients = customers.length;
