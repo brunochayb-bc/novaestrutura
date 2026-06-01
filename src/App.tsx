@@ -33,7 +33,8 @@ import {
   Timer,
   Scale,
   Eye,
-  EyeOff
+  EyeOff,
+  Home
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -78,11 +79,11 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
   'Clientes PF': '#d946ef',    // Fuchsia
 };
 
-type View = 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organograma';
+type View = 'premissas' | 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organograma';
 
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [currentView, setCurrentView] = useState<View>('premissas');
   const [isSizingExpanded, setIsSizingExpanded] = useState(true);
   const [selectedVerticals, setSelectedVerticals] = useState<Vertical[]>([
     'Financeiro I',
@@ -93,7 +94,7 @@ export default function App() {
   ]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTopClientsVisible, setIsTopClientsVisible] = useState<boolean>(() => {
-    return localStorage.getItem('isTopClientsVisible') !== 'false';
+    return localStorage.getItem('isTopClientsVisible') === 'true';
   });
   const [expandedDetailVerticals, setExpandedDetailVerticals] = useState<Record<string, boolean>>({});
 
@@ -644,6 +645,424 @@ export default function App() {
               </div>
             </div>
           </motion.footer>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPremissas = () => {
+    return (
+      <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
+        {/* Header Hero Banner */}
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-slate-950 p-6 md:p-8 border border-white/10 rounded-2xl shrink-0 shadow-2xl relative overflow-hidden">
+          {/* Subtle Ambient Background Light */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full filter blur-[100px] -mr-20 -mt-20 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/10 rounded-full filter blur-[100px] -ml-20 -mb-20 pointer-events-none" />
+          
+          <div className="relative z-10 space-y-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full inline-block">
+              Diretrizes Corporativas
+            </span>
+            <h1 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+              Premissas de Negócio e Organização
+            </h1>
+            <p className="text-slate-400 text-xs md:text-sm max-w-2xl font-semibold leading-relaxed">
+              Consolidação das diretrizes táticas, focos operacionais e estratégias de cobertura comercial para reestruturação das equipes, expansão da receita e retenção do portfólio.
+            </p>
+          </div>
+          
+          <div className="mt-4 md:mt-0 relative z-10 shrink-0 flex items-center bg-slate-950/60 p-4 border border-white/5 rounded-2xl space-x-4">
+            <div className="text-left">
+              <span className="text-[8px] font-bold text-slate-500 block uppercase font-mono">Início Previsto</span>
+              <span className="text-xs font-black text-emerald-400 block mt-0.5 uppercase tracking-wide flex items-center">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
+                julho/2026
+              </span>
+            </div>
+            <div className="h-8 w-[1px] bg-white/10" />
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-slate-950 hover:from-sky-400 hover:to-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:shadow-sky-500/20 active:scale-95 flex items-center space-x-2 animate-pulse"
+            >
+              <span>Ir para o Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Bento Grid highlighting the cards */}
+        <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            {/* Card 1: Modelo Baseado em Ataque e Defesa */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-sky-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-full filter blur-2xl group-hover:bg-sky-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <Target className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#0ea5e9] bg-[#0ea5e9]/10 border border-[#0ea5e9]/20 px-2.5 py-0.5 rounded-full">
+                    Ataque & Defesa
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-sky-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Modelo baseado em ataque e defesa
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide text-left">
+                    Atuação Tática e Separação de Esforços
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Bifurcação estratégia da força de vendas para expansão e retenção da base instalada.
+                </p>
+
+                <div className="border-t border-white/5 pt-4 space-y-2.5 text-left">
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-black block">Força de Ataque</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">Incentivo absoluto para exploração de novas receitas e novos contratos – incluindo upsell, cross-sell, novos clientes.</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-black block">Estrutura de Defesa</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">Controle rigorosa de churn, gestão contratual, renovações/reajustes, suspensões e identificação de leads potenciais.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <button
+                  onClick={() => setCurrentView('organograma')}
+                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>Ver Organograma Geral</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Card 2: Executivo de Vendas + Gerente de Contas (AM) */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-indigo-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full filter blur-2xl group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#8b5cf6] bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 px-2.5 py-0.5 rounded-full">
+                    Parceria no Campo
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Executivo de Vendas + Gerente de Contas (AM)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide text-left">
+                    Complementaridade Executiva e Técnica
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Complementação operacional onde o Executivo de Vendas e o Account Manager atuam de forma coordenada para maximizar o ciclo de faturamento e expansão.
+                </p>
+
+                <div className="border-t border-white/5 pt-4 space-y-2.5 text-left">
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-black block">Executivo de Vendas (EV)</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">Responsável por novas vendas, identificação de novas oportunidades, desenvolvimento e fechamento de novos negócios (incluindo upsell e cross-sell).</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-black block">Gerente de Contas (AM / Farmer)</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">Gestão da carteira de clientes, renovações e reajustes contratuais, reversão de cancelamentos, inadimplência, suspensões e identificação de oportunidades para upsell e cross-sell.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <button
+                  onClick={() => setCurrentView('executivos')}
+                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>Analisar Sizing de Vendas (EV/AM)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Card 3: Customer Success Estratégico */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-amber-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full filter blur-2xl group-hover:bg-amber-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <Zap className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/20 px-2.5 py-0.5 rounded-full">
+                    Atendimento Estratégico
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-amber-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Customer Success Estratégico
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide text-left">
+                    Foco e estratégia
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Apoio e suporte total a operação de gestão da carteira de clientes, com direcionamento conforme vertical de atuação e saúde das contas administradas.
+                </p>
+
+                <div className="border-t border-white/5 pt-4 space-y-2 text-left">
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 mr-2.5 shrink-0" />
+                    <span className="text-white text-xs font-black">Foco e direcionamento estratégico:</span>
+                  </div>
+                  <div className="flex items-start pl-4">
+                    <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 mr-2 shrink-0" />
+                    <span className="text-slate-400 text-[11px] font-semibold">Aumentar engajamento</span>
+                  </div>
+                  <div className="flex items-start pl-4">
+                    <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 mr-2 shrink-0" />
+                    <span className="text-slate-400 text-[11px] font-semibold">Combate ao churn</span>
+                  </div>
+                  <div className="flex items-start pl-4">
+                    <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 mr-2 shrink-0" />
+                    <span className="text-slate-400 text-[11px] font-semibold">Identificação de leads comerciais</span>
+                  </div>
+                  <div className="flex items-start pl-4">
+                    <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 mr-2 shrink-0" />
+                    <span className="text-slate-400 text-[11px] font-semibold">Migração do terminal.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <button
+                  onClick={() => setCurrentView('low_touch')}
+                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>Analisar Clientes Low-Touch (≤ 10k)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Card 4: Definição de Métricas por Vertical */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-emerald-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full filter blur-2xl group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <Scale className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/20 px-2.5 py-0.5 rounded-full">
+                    Cobertura Comercial
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Definição de Métricas por Vertical
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide text-left">
+                    Cobertura comercial baseada no perfil dos clientes
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Visitas presenciais e contatos remotos como premissa para manutenção e abertura de novas frentes comerciais
+                </p>
+
+                <div className="border-t border-white/5 pt-4 space-y-2.5 text-left">
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-slate-300 text-xs font-semibold leading-relaxed">Definição do sizing e perfil do time comercial pelo perfil da carteira de clientes.</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-slate-300 text-xs font-semibold leading-relaxed">Calibração do modelo ideal vs. Modelo possível, a partir do tamanho do time</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <button
+                  onClick={() => setCurrentView('operational')}
+                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>Analisar Sizing de CS</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Card 5: Revisão do Modelo de RV */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-fuchsia-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/5 rounded-full filter blur-2xl group-hover:bg-fuchsia-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-fuchsia-500/10 border border-fuchsia-500/20 flex items-center justify-center text-fuchsia-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <DollarSign className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#d946ef] bg-[#d946ef]/10 border border-[#d946ef]/20 px-2.5 py-0.5 rounded-full">
+                    Remuneração Dinâmica
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-fuchsia-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Adequação do Modelo de Remuneração Variável
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wide text-left">
+                    Modelo mais aderente ao negócio (ataque x defesa)
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Novo modelo mais justo, participativo e como incentivo para toda a estrutura de Vendas, respeitando a saúde financeira da companhia.
+                </p>
+
+                <div className="border-t border-white/5 pt-4 space-y-2.5 text-left">
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-bold block">Pisos flexíveis como incentivo</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-bold block">Aceleradores para incentivar antecipação de receita</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-bold block">Modelo de ataque, defesa e para garantir a saúde da base</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="w-1.5 h-1.5 rounded-full bg-pink-400 mt-2 mr-2.5 shrink-0" />
+                    <div>
+                      <span className="text-white text-xs font-bold block">Possibilidade de pagamento de bônus por negociação fechada</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <a
+                  href="https://rv-comercial-framework.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white shadow-lg shadow-fuchsia-500/20 hover:shadow-fuchsia-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-fuchsia-500/30 text-center"
+                >
+                  <span>Novo Modelo RV</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </motion.div>
+
+            {/* Card 6: Canal de Clientes Low-Touch */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-slate-905/70 hover:bg-slate-900/95 border border-white/5 hover:border-violet-500/20 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden md:col-span-2 lg:col-span-1"
+              style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full filter blur-2xl group-hover:bg-violet-500/10 transition-colors pointer-events-none" />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shadow-inner group-hover:scale-110 transition-transform">
+                    <Monitor className="w-6 h-6" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2.5 py-0.5 rounded-full">
+                    Atendimento Massificado
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-black text-white group-hover:text-violet-400 transition-colors uppercase tracking-tight leading-none text-left">
+                    Canal de Clientes Low-Touch
+                  </h3>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
+                  Garantia de atendimento e monitoramento remoto e inteligente das contas de baixo ticker (low-touch), aliando ferramentas remotas e automoção – direcionando alocação de esforços para as contas estratégicas da companhia.
+                </p>
+
+                <div className="border-t border-white/5 pt-4 text-left">
+                  <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                    Atualmente, cerca de 1.500 contas, 2.400 usuários, tem faturamento próximo de R$ 3,8MM (23% da base).
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+                <button
+                  onClick={() => setCurrentView('low_touch')}
+                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                >
+                  <span>Analisar Clientes Low-Touch (≤ 10k)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+
+          </div>
         </div>
       </div>
     );
@@ -1403,7 +1822,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1 }}
-              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col"
+              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col relative z-10 hover:z-30 focus-within:z-30 transition-all duration-300"
             >
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <BarChart3 className="w-3.5 h-3.5 mr-2 text-sky-500" />
@@ -1421,6 +1840,8 @@ export default function App() {
                       itemStyle={{ color: '#fff' }}
                       labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
                       formatter={(val: number) => [formatCurrency(val), 'MRR Total']}
+                      wrapperStyle={{ zIndex: 1000 }}
+                      allowEscapeViewBox={{ x: true, y: true }}
                     />
                     <Bar dataKey="revenue" radius={[0, 6, 6, 0]} barSize={20}>
                       {barData.map((entry, index) => (
@@ -1436,12 +1857,12 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
-              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col"
+              className="bg-slate-900/40 border border-white/5 rounded-2xl p-5 flex flex-col relative z-10 hover:z-30 focus-within:z-30 transition-all duration-300"
             >
               <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center">
                 <PieIcon className="w-3.5 h-3.5 mr-2 text-indigo-500" />
-                Participação de Mercado
-                <InfoTooltip text="Proporção da receita total gerada por cada pilar" />
+                Share de Faturamento
+                <InfoTooltip text="Proporção do faturamento total gerado por cada pilar" />
               </h3>
               <div className="flex-1 flex items-center min-h-0">
                 <div className="w-[45%] h-full">
@@ -1467,6 +1888,8 @@ export default function App() {
                           `${((value / data.totalRevenue) * 100).toFixed(1)}%`,
                           name
                         ]}
+                        wrapperStyle={{ zIndex: 1000 }}
+                        allowEscapeViewBox={{ x: true, y: true }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -2334,7 +2757,7 @@ export default function App() {
             </div>
             <div className="space-y-1">
               <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">
-                Dashboard Vendas
+                Nova Estrutura Vendas 2026
               </h1>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em]">BROADCAST</p>
             </div>
@@ -2422,13 +2845,46 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="flex flex-col"
               >
-                <span className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase leading-none mb-1">Dashboard</span>
-                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap uppercase">Vendas</span>
+                <span className="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase leading-none mb-1">Nova Estrutura</span>
+                <span className="text-lg font-black text-white tracking-tighter leading-none whitespace-nowrap uppercase">Vendas 2026</span>
               </motion.div>
             )}
           </div>
 
           <nav className="space-y-1 relative">
+            {/* Premissas (Home/Strategic assumptions) */}
+            <button
+              onClick={() => setCurrentView('premissas')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'premissas'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'premissas' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <Home className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'premissas' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Premissas</span>
+              )}
+              {currentView === 'premissas' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+
             {/* Visão Geral (Dashboard) */}
             <button
               onClick={() => setCurrentView('dashboard')}
@@ -2617,7 +3073,18 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 p-6 relative overflow-y-auto scroll-smooth">
         <AnimatePresence mode="wait">
-          {currentView === 'dashboard' ? (
+          {currentView === 'premissas' ? (
+            <motion.div 
+              key="premissas"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderPremissas()}
+            </motion.div>
+          ) : currentView === 'dashboard' ? (
             <motion.div 
               key="dashboard"
               initial={{ opacity: 0, y: 10 }}
