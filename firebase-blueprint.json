@@ -37,6 +37,12 @@
         "execCapacity": { "type": "number" },
         "hc_operational": { "type": "string" },
         "hc_vendas": { "type": "string" },
+        "hc_lider_vertical": { "type": "string" },
+        "hc_low_touch": { "type": "string" },
+        "hc_low_touch_atual": { "type": "string" },
+        "promoted_low_touch": { "type": "string" },
+        "sales_hc_state": { "type": "string" },
+        "cs_indicators": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["execCapacity", "updatedAt"]

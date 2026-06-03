@@ -6,6 +6,7 @@ import {
   setDoc, 
   updateDoc, 
   serverTimestamp,
+  onSnapshot,
   type DocumentData
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
@@ -91,6 +92,25 @@ export const verticalDataService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  subscribeAll(callback: (data: Record<string, any>) => void, onError?: (error: any) => void) {
+    const path = 'verticalData';
+    try {
+      return onSnapshot(collection(db, path), (querySnapshot) => {
+        const data: Record<string, any> = {};
+        querySnapshot.forEach((doc) => {
+          const originalId = desanitizeId(doc.id);
+          data[originalId] = doc.data();
+        });
+        callback(data);
+      }, (error) => {
+        if (onError) onError(error);
+        handleFirestoreError(error, OperationType.GET, path);
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+    }
   }
 };
 
@@ -131,6 +151,12 @@ export const globalSettingsService = {
           execCapacity?: number;
           hc_operational?: string;
           hc_vendas?: string;
+          hc_lider_vertical?: string;
+          hc_low_touch?: string;
+          hc_low_touch_atual?: string;
+          promoted_low_touch?: string;
+          sales_hc_state?: string;
+          cs_indicators?: string;
         };
       }
       return null;
@@ -140,7 +166,17 @@ export const globalSettingsService = {
     }
   },
 
-  async saveGlobalSettings(data: { execCapacity?: number; hc_operational?: string; hc_vendas?: string }) {
+  async saveGlobalSettings(data: { 
+    execCapacity?: number; 
+    hc_operational?: string; 
+    hc_vendas?: string; 
+    hc_lider_vertical?: string;
+    hc_low_touch?: string;
+    hc_low_touch_atual?: string;
+    promoted_low_touch?: string;
+    sales_hc_state?: string;
+    cs_indicators?: string;
+  }) {
     const path = 'settings/global';
     try {
       await setDoc(doc(db, 'settings', 'global'), {
@@ -150,6 +186,22 @@ export const globalSettingsService = {
       }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  subscribeGlobalSettings(callback: (data: any) => void, onError?: (error: any) => void) {
+    const path = 'settings/global';
+    try {
+      return onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+        if (docSnap.exists()) {
+          callback(docSnap.data());
+        }
+      }, (error) => {
+        if (onError) onError(error);
+        handleFirestoreError(error, OperationType.GET, path);
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
     }
   }
 };

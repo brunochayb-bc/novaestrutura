@@ -18,6 +18,9 @@ import {
   Calendar,
   Phone,
   ArrowRight,
+  ArrowUpRight,
+  Undo,
+  Check,
   Info,
   Menu,
   ChevronLeft,
@@ -79,12 +82,71 @@ const VERTICAL_COLORS: Record<Vertical, string> = {
   'Clientes PF': '#d946ef',    // Fuchsia
 };
 
-type View = 'premissas' | 'dashboard' | 'operational' | 'executivos' | 'low_touch' | 'organograma';
+interface CSIndicator {
+  id: string;
+  name: string;
+  weight: number;
+  target: number;
+  realized: number;
+}
+
+type View = 'premissas' | 'dashboard' | 'estrutura_ideal' | 'operational' | 'executivos' | 'low_touch' | 'organograma' | 'tres_papeis' | 'performance_cs';
 
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
   const [currentView, setCurrentView] = useState<View>('premissas');
+  const [csIndicators, setCsIndicators] = useState<CSIndicator[]>(() => {
+    try {
+      const saved = localStorage.getItem('cs_indicators');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return [
+      { id: 'engajamento', name: 'Engajamento (DAU/MAU)', weight: 0.25, target: 80, realized: 75 },
+      { id: 'features', name: 'Adoção features (DAU/MAU)', weight: 0.25, target: 60, realized: 52 },
+      { id: 'nao_uso', name: 'Não-uso (NAU)', weight: 0.25, target: 90, realized: 85 },
+      { id: 'nps', name: 'NPS Operacional', weight: 0.20, target: 50, realized: 42 },
+    ];
+  });
   const [isSizingExpanded, setIsSizingExpanded] = useState(true);
+  const [isOrganogramaExpanded, setIsOrganogramaExpanded] = useState(true);
+  const [salesHCState, setSalesHCState] = useState<Record<string, { gr: number; ev: number; gc: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('sales_hc_state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const enriched = { ...parsed };
+        Object.keys(enriched).forEach(k => {
+          if (enriched[k] && typeof enriched[k] === 'object') {
+            if (enriched[k].gr === undefined) enriched[k].gr = 0.0;
+          }
+        });
+        return enriched;
+      }
+    } catch (_) {}
+    return {
+      'FINANCEIRO I': { gr: 0.0, ev: 0.5, gc: 2.0 },
+      'FINANCEIRO II': { gr: 0.0, ev: 0.4, gc: 1.0 },
+      'GOVERNO': { gr: 0.0, ev: 0.2, gc: 1.0 },
+      'AGRO/CORP': { gr: 0.0, ev: 0.2, gc: 1.0 }
+    };
+  });
+
+  const updateSalesHC = (v: string, role: 'gr' | 'ev' | 'gc', value: number) => {
+    const nextState = {
+      ...salesHCState,
+      [v]: {
+        ...salesHCState[v],
+        [role]: Math.max(0, value)
+      }
+    };
+    setSalesHCState(nextState);
+    localStorage.setItem('sales_hc_state', JSON.stringify(nextState));
+    if (user) {
+      globalSettingsService.saveGlobalSettings({
+        sales_hc_state: JSON.stringify(nextState)
+      }).catch(console.error);
+    }
+  };
   const [selectedVerticals, setSelectedVerticals] = useState<Vertical[]>([
     'Financeiro I',
     'Financeiro II',
@@ -135,10 +197,59 @@ export default function App() {
   });
   const [isHcOperationalSaving, setIsHcOperationalSaving] = useState(false);
 
-  const [hcVendas, setHcVendas] = useState<string>(() => {
+   const [hcVendas, setHcVendas] = useState<string>(() => {
     return localStorage.getItem('hc_vendas') || '0';
   });
   const [isHcVendasSaving, setIsHcVendasSaving] = useState(false);
+
+  const [hcLiderVertical, setHcLiderVertical] = useState<string>(() => {
+    return localStorage.getItem('hc_lider_vertical') || '5.0';
+  });
+  const [isHcLiderVerticalSaving, setIsHcLiderVerticalSaving] = useState(false);
+
+  const [hcLowTouch, setHcLowTouch] = useState<string>(() => {
+    return localStorage.getItem('hc_low_touch') || '1.0';
+  });
+  const [isHcLowTouchSaving, setIsHcLowTouchSaving] = useState(false);
+
+  const [hcLowTouchAtual, setHcLowTouchAtual] = useState<string>(() => {
+    return localStorage.getItem('hc_low_touch_atual') || '1.0';
+  });
+  const [isHcLowTouchAtualSaving, setIsHcLowTouchAtualSaving] = useState(false);
+
+  const saveHcLowTouch = async (val?: string) => {
+    const targetVal = val !== undefined ? val : hcLowTouch;
+    setIsHcLowTouchSaving(true);
+    localStorage.setItem('hc_low_touch', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ hc_low_touch: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving hc_low_touch to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsHcLowTouchSaving(false);
+      }, 1000);
+    }
+  };
+
+  const saveHcLowTouchAtual = async (val?: string) => {
+    const targetVal = val !== undefined ? val : hcLowTouchAtual;
+    setIsHcLowTouchAtualSaving(true);
+    localStorage.setItem('hc_low_touch_atual', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ hc_low_touch_atual: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving hc_low_touch_atual to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsHcLowTouchAtualSaving(false);
+      }, 1000);
+    }
+  };
 
   const saveHcOperational = async () => {
     setIsHcOperationalSaving(true);
@@ -152,6 +263,23 @@ export default function App() {
     } finally {
       setTimeout(() => {
         setIsHcOperationalSaving(false);
+      }, 1000);
+    }
+  };
+
+  const saveHcLiderVertical = async (val?: string) => {
+    const targetVal = val !== undefined ? val : hcLiderVertical;
+    setIsHcLiderVerticalSaving(true);
+    localStorage.setItem('hc_lider_vertical', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ hc_lider_vertical: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving hc_lider_vertical to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsHcLiderVerticalSaving(false);
       }, 1000);
     }
   };
@@ -173,7 +301,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (currentView === 'operational' || currentView === 'executivos') {
+    if (currentView === 'operational' || currentView === 'executivos' || currentView === 'low_touch') {
       setIsSizingExpanded(true);
     }
   }, [currentView]);
@@ -247,51 +375,229 @@ export default function App() {
     'Clientes PF': { visitasAno: 0, contatosRemotosAno: 0, percentDesuso: 0, percentRemotos: 0, percentNaoAcessiveis: 0 },
   };
 
-  const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(initialOpSettings);
-  const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(initialParams);
+  const [opSettings, setOpSettings] = useState<Record<Vertical, OperationalSettings>>(() => {
+    try {
+      const saved = localStorage.getItem('op_settings');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return initialOpSettings;
+  });
+  const [opParams, setOpParams] = useState<Record<Vertical, VerticalOperationalParams>>(() => {
+    try {
+      const saved = localStorage.getItem('op_params');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return initialParams;
+  });
 
-  // Firestore Loading Effect
+  // Helper utility to uniquely identify customers without generic auto-increment IDs
+  const getClientKey = (client: { name: string; vertical?: string; revenue: number }) => {
+    return `${client.vertical || ''}_____${client.name}_____${client.revenue}`;
+  };
+
+  const [promotedLowTouchKeys, setPromotedLowTouchKeys] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('promoted_low_touch_keys');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleTogglePromotion = async (client: { name: string; vertical?: string; revenue: number }) => {
+    const clientKey = getClientKey(client);
+    let updatedKeys: string[];
+    if (promotedLowTouchKeys.includes(clientKey)) {
+      updatedKeys = promotedLowTouchKeys.filter(k => k !== clientKey);
+    } else {
+      updatedKeys = [...promotedLowTouchKeys, clientKey];
+    }
+    setPromotedLowTouchKeys(updatedKeys);
+    localStorage.setItem('promoted_low_touch_keys', JSON.stringify(updatedKeys));
+    
+    // Sync with Firebase if user is logged in
+    if (user) {
+      try {
+        await globalSettingsService.saveGlobalSettings({
+          promoted_low_touch: JSON.stringify(updatedKeys)
+        });
+      } catch (err) {
+        console.error('Error saving promoted_low_touch to Firestore:', err);
+      }
+    }
+  };
+
+  // Firestore Loading Effect with Real-Time Synchronization
   useEffect(() => {
     if (!user) return;
 
-    const loadFirestoreData = async () => {
-      setIsSyncing(true);
-      try {
-        const vData = await verticalDataService.getAll();
+    setIsSyncing(true);
+    let loadedVerticals = false;
+    let loadedGlobal = false;
 
-        if (Object.keys(vData).length > 0) {
-          const newOpSettings = { ...initialOpSettings };
-          const newOpParams = { ...initialParams };
-
-          (Object.keys(vData) as Vertical[]).forEach(v => {
-            if (vData[v].settings) newOpSettings[v] = vData[v].settings;
-            if (vData[v].params) newOpParams[v] = vData[v].params;
-          });
-
-          setOpSettings(newOpSettings);
-          setOpParams(newOpParams);
-        }
-
-        // Load Global Configuration
-        const gSettings = await globalSettingsService.getGlobalSettings();
-        if (gSettings) {
-          if (gSettings.hc_operational !== undefined) {
-            setHcOperational(gSettings.hc_operational);
-            localStorage.setItem('hc_operational', gSettings.hc_operational);
-          }
-          if (gSettings.hc_vendas !== undefined) {
-            setHcVendas(gSettings.hc_vendas);
-            localStorage.setItem('hc_vendas', gSettings.hc_vendas);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load Firestore data:', error);
-      } finally {
+    const checkFirstLoadComplete = () => {
+      if (loadedVerticals && loadedGlobal) {
         setIsSyncing(false);
       }
     };
 
-    loadFirestoreData();
+    // Real-time listener for Vertical Data
+    const unsubVerticals = verticalDataService.subscribeAll(
+      (vData) => {
+        if (Object.keys(vData).length > 0) {
+          const newOpSettings = { ...initialOpSettings };
+          const newOpParams = { ...initialParams };
+
+          (Object.keys(vData) as Vertical[]).forEach((v) => {
+            if (vData[v].settings) newOpSettings[v] = vData[v].settings;
+            if (vData[v].params) newOpParams[v] = vData[v].params;
+          });
+
+          setOpSettings(prev => {
+            // Only update if there has actual changes to avoid losing local typing state focus unnecessary
+            if (JSON.stringify(prev) !== JSON.stringify(newOpSettings)) {
+              localStorage.setItem('op_settings', JSON.stringify(newOpSettings));
+              return newOpSettings;
+            }
+            return prev;
+          });
+
+          setOpParams(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(newOpParams)) {
+              localStorage.setItem('op_params', JSON.stringify(newOpParams));
+              return newOpParams;
+            }
+            return prev;
+          });
+        }
+        loadedVerticals = true;
+        checkFirstLoadComplete();
+      },
+      (error) => {
+        console.error('Failed to subscribe to verticalData:', error);
+        loadedVerticals = true;
+        checkFirstLoadComplete();
+      }
+    );
+
+    // Real-time listener for Global Settings
+    const unsubGlobal = globalSettingsService.subscribeGlobalSettings(
+      (gSettings) => {
+        if (gSettings) {
+          if (gSettings.hc_operational !== undefined) {
+            setHcOperational((prev) => {
+              if (prev !== gSettings.hc_operational) {
+                localStorage.setItem('hc_operational', gSettings.hc_operational);
+                return gSettings.hc_operational;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.hc_vendas !== undefined) {
+            setHcVendas((prev) => {
+              if (prev !== gSettings.hc_vendas) {
+                localStorage.setItem('hc_vendas', gSettings.hc_vendas);
+                return gSettings.hc_vendas;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.hc_lider_vertical !== undefined) {
+            setHcLiderVertical((prev) => {
+              if (prev !== gSettings.hc_lider_vertical) {
+                localStorage.setItem('hc_lider_vertical', gSettings.hc_lider_vertical);
+                return gSettings.hc_lider_vertical;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.hc_low_touch !== undefined) {
+            setHcLowTouch((prev) => {
+              if (prev !== gSettings.hc_low_touch) {
+                localStorage.setItem('hc_low_touch', gSettings.hc_low_touch);
+                return gSettings.hc_low_touch;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.hc_low_touch_atual !== undefined) {
+            setHcLowTouchAtual((prev) => {
+              if (prev !== gSettings.hc_low_touch_atual) {
+                localStorage.setItem('hc_low_touch_atual', gSettings.hc_low_touch_atual);
+                return gSettings.hc_low_touch_atual;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.promoted_low_touch !== undefined) {
+            try {
+              const parsedKeys = JSON.parse(gSettings.promoted_low_touch);
+              if (Array.isArray(parsedKeys)) {
+                setPromotedLowTouchKeys((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(parsedKeys)) {
+                    localStorage.setItem('promoted_low_touch_keys', gSettings.promoted_low_touch);
+                    return parsedKeys;
+                  }
+                  return prev;
+                });
+              }
+            } catch (e) {
+              console.error('Failed to parse promoted_low_touch:', e);
+            }
+          }
+          if (gSettings.sales_hc_state !== undefined) {
+            try {
+              const parsedSalesHC = JSON.parse(gSettings.sales_hc_state);
+              if (parsedSalesHC && typeof parsedSalesHC === 'object') {
+                const enriched = { ...parsedSalesHC };
+                Object.keys(enriched).forEach((k) => {
+                  if (enriched[k] && typeof enriched[k] === 'object') {
+                    if (enriched[k].gr === undefined) enriched[k].gr = 0.0;
+                  }
+                });
+                setSalesHCState((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(enriched)) {
+                    localStorage.setItem('sales_hc_state', JSON.stringify(enriched));
+                    return enriched;
+                  }
+                  return prev;
+                });
+              }
+            } catch (e) {
+              console.error('Failed to parse sales_hc_state:', e);
+            }
+          }
+          if (gSettings.cs_indicators !== undefined) {
+            try {
+              const parsedCSIndicators = JSON.parse(gSettings.cs_indicators);
+              if (Array.isArray(parsedCSIndicators)) {
+                setCsIndicators((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(parsedCSIndicators)) {
+                    localStorage.setItem('cs_indicators', gSettings.cs_indicators);
+                    return parsedCSIndicators;
+                  }
+                  return prev;
+                });
+              }
+            } catch (e) {
+              console.error('Failed to parse cs_indicators:', e);
+            }
+          }
+        }
+        loadedGlobal = true;
+        checkFirstLoadComplete();
+      },
+      (error) => {
+        console.error('Failed to subscribe to global settings:', error);
+        loadedGlobal = true;
+        checkFirstLoadComplete();
+      }
+    );
+
+    return () => {
+      if (unsubVerticals) unsubVerticals();
+      if (unsubGlobal) unsubGlobal();
+    };
   }, [user]);
 
   const handleSave = async (vertical: Vertical) => {
@@ -334,7 +640,10 @@ export default function App() {
       totalRevenue: number, 
       headcount: number,
       fixedHC: number,
-      variableHC: number
+      variableHC: number,
+      gr: number,
+      ev: number,
+      gc: number
     }> = {};
 
     const verticalMap: Record<string, Vertical> = {
@@ -346,7 +655,8 @@ export default function App() {
 
     verticals.forEach(v => {
       let clients = customers.filter(c => (c.vertical || '').toUpperCase().trim() === v);
-      clients = clients.filter(c => c.revenue > 10000);
+      // Inclui contas com MRR > 10k OU contas promovidas manualmente do low-touch
+      clients = clients.filter(c => c.revenue > 10000 || promotedLowTouchKeys.includes(getClientKey(c)));
       clients.sort((a, b) => b.revenue - a.revenue);
       
       const totalRevenue = clients.reduce((sum, c) => sum + c.revenue, 0);
@@ -368,19 +678,29 @@ export default function App() {
       const vExecCapacity = opSettings[vPascal]?.execCapacity || 30;
 
       const variableHC = variableCount / vExecCapacity;
-      const headcount = fixedHC + variableHC;
+      
+      // GR, EV and GC default if state does not have it, otherwise from state
+      const gr = salesHCState[v]?.gr !== undefined ? salesHCState[v].gr : 0.0;
+      const ev = salesHCState[v]?.ev !== undefined ? salesHCState[v].ev : variableHC;
+      const gc = salesHCState[v]?.gc !== undefined ? salesHCState[v].gc : fixedHC;
+
+      // "A soma de GR, EV e GC, por vertical, reflete no total HC de cada vertical."
+      const headcount = gr + ev + gc;
 
       result[v] = {
         clients: clients as any, // Cast for compatibility with SalesClient type
         totalRevenue,
         headcount,
         fixedHC,
-        variableHC
+        variableHC,
+        gr,
+        ev,
+        gc
       };
     });
 
     return result;
-  }, [opSettings]);
+  }, [opSettings, salesHCState, promotedLowTouchKeys]);
 
   const salesTotals = useMemo(() => {
     const values = Object.values(filteredSalesData) as Array<{ 
@@ -392,8 +712,8 @@ export default function App() {
     const totalRevenue = values.reduce((sum, v) => sum + v.totalRevenue, 0);
     const totalHeadcount = values.reduce((sum, v) => sum + v.headcount, 0);
     
-    // Percentages based on actual dataset reference
-    const grandTotalAccounts = data.totalClients;
+    // Percentages based on actual dataset reference (excluindo a carteira PF)
+    const grandTotalAccounts = 1419;
     const grandTotalRevenue = data.totalRevenue;
 
     const accountPercentage = (totalClients / grandTotalAccounts) * 100;
@@ -415,22 +735,29 @@ export default function App() {
     'FINANCEIRO II': false,
     'GOVERNO': false,
     'AGRO/CORP': false,
+    'CLIENTES PF': false,
   });
+
+  const [expandedPromotedList, setExpandedPromotedList] = useState(true);
 
   const toggleLowTouchVertical = (v: string) => {
     setExpandedLowTouchVerticals(prev => ({ ...prev, [v]: !prev[v] }));
   };
 
   const renderLowTouch = () => {
-    const lowTouchClients = customers
+    const allLowTouchClients = customers
       .filter(client => client.revenue <= 10000.01) // Handle threshold precisely
       .sort((a, b) => b.revenue - a.revenue);
+
+    const lowTouchClients = allLowTouchClients.filter(client => !promotedLowTouchKeys.includes(getClientKey(client)));
+    const promotedClients = allLowTouchClients.filter(client => promotedLowTouchKeys.includes(getClientKey(client)));
 
     const groupedClients: Record<string, any[]> = {
       'FINANCEIRO I': [],
       'FINANCEIRO II': [],
       'GOVERNO': [],
-      'AGRO/CORP': []
+      'AGRO/CORP': [],
+      'CLIENTES PF': []
     };
 
     lowTouchClients.forEach(client => {
@@ -440,17 +767,36 @@ export default function App() {
       }
     });
 
-    const verticalOrder = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'];
+    const verticalOrder = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP', 'CLIENTES PF'];
 
     const totalLowTouchRevenue = lowTouchClients.reduce((acc, c) => acc + c.revenue, 0);
     const totalLowTouchUsers = lowTouchClients.reduce((acc, c) => acc + c.users, 0);
+
+    // Separando o que é PJ e o que é Cliente PF
+    const pjClients = lowTouchClients.filter(client => {
+      const v = (client.vertical || '').toUpperCase().trim();
+      return v === 'FINANCEIRO I' || v === 'FINANCEIRO II' || v === 'GOVERNO' || v === 'AGRO/CORP';
+    });
+    
+    const pfClients = lowTouchClients.filter(client => {
+      const v = (client.vertical || '').toUpperCase().trim();
+      return v === 'CLIENTES PF';
+    });
+
+    const pjCount = pjClients.length;
+    const pjRevenue = pjClients.reduce((acc, c) => acc + c.revenue, 0);
+    const pjUsers = pjClients.reduce((acc, c) => acc + c.users, 0);
+
+    const pfCount = pfClients.length;
+    const pfRevenue = pfClients.reduce((acc, c) => acc + c.revenue, 0);
+    const pfUsers = pfClients.reduce((acc, c) => acc + c.users, 0);
 
     return (
       <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
         <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-6 shrink-0 shadow-2xl">
           <div className="flex flex-col">
             <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-              Carteira Low-Touch (MRR {'\u2264'} R$ 10k)
+              Carteira Low-Touch (MRR R$ 10k)
             </h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
               <span className="text-yellow-400 font-black bg-yellow-400/10 px-2 py-1 rounded-[6px] border border-yellow-400/20 inline-block">
@@ -491,7 +837,185 @@ export default function App() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-6 scroll-smooth">
+        <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-6 scroll-smooth space-y-6">
+          
+          {/* QUADRO "CONSOLIDADO LOW-TOUCH" TRAZIDO PARA O TOPO */}
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-white/10 rounded-[2rem] p-6 md:p-8 relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.4)]"
+          >
+            <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none rotate-12">
+              <BarChart3 className="w-60 h-60 text-white" />
+            </div>
+            
+            <div className="relative z-10 space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-white/5 pb-5">
+                <div className="flex flex-col space-y-2 text-left">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Consolidado Low-Touch</h3>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1">
+                    Métricas acumuladas com divisão detalhada entre Pessoa Jurídica (PJ) e Clientes PF.
+                  </p>
+                </div>
+                
+                <div className="flex items-center bg-slate-950/80 rounded-xl border border-white/5 p-2 px-6 shadow-xl space-x-6">
+                  <div className="flex flex-col border-r border-white/5 pr-6 py-1 text-center">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Ticket Médio Geral</span>
+                    <span className="text-sm font-mono font-black text-white">
+                      {formatCurrency(lowTouchClients.length > 0 ? totalLowTouchRevenue / lowTouchClients.length : 0)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col pl-6 py-1 text-center">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Usuários / Cliente</span>
+                    <span className="text-sm font-mono font-black text-white">
+                      {(lowTouchClients.length > 0 ? totalLowTouchUsers / lowTouchClients.length : 0).toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Headcount Configuration for Low-Touch */}
+              <div className="bg-slate-950/65 rounded-2xl border border-white/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-left shadow-inner">
+                <div className="space-y-1 max-w-xl">
+                  <h4 className="text-sm font-black text-white uppercase tracking-tight flex items-center">
+                    <Users className="w-4 h-4 text-sky-400 mr-2" />
+                    Sizing de Headcount dedicado p/ Low-Touch
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+                    Ajuste o headcount necessário estrutural para o atendimento destas contas low-touch. Esse valor atualiza dinamicamente o organograma consolidado e a calculadora de estrutura de contratação/sizing ideal.
+                  </p>
+                </div>
+                
+                <div className="flex items-center space-x-3 shrink-0 bg-slate-900/60 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Headcount Necessário:</span>
+                  <div className="inline-flex items-center space-x-1 border border-white/5 bg-slate-950 rounded-lg p-0.5 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = parseFloat(hcLowTouch || '0');
+                        const next = Math.max(0, current - 0.5);
+                        setHcLowTouch(next.toFixed(1));
+                        saveHcLowTouch(next.toFixed(1));
+                      }}
+                      className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center hover:text-white"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={hcLowTouch}
+                      onChange={(e) => {
+                        setHcLowTouch(e.target.value);
+                        saveHcLowTouch(e.target.value);
+                      }}
+                      className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-black outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = parseFloat(hcLowTouch || '0');
+                        const next = current + 0.5;
+                        setHcLowTouch(next.toFixed(1));
+                        saveHcLowTouch(next.toFixed(1));
+                      }}
+                      className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center hover:text-white"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {isHcLowTouchSaving && (
+                    <span className="text-[9px] font-black uppercase text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded animate-pulse">
+                      Salvando...
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid de Divisão PJ vs PF */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Card 1: Geral Consolidado */}
+                <div className="bg-slate-900/40 p-6 rounded-2xl border border-white/5 flex flex-col justify-between text-left shadow-lg animate-none">
+                  <div>
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Total Consolidado</span>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Carteira Geral</h4>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Volume de Contas</span>
+                      <span className="text-sm font-mono font-black text-white">{formatNumber(lowTouchClients.length)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Volume MRR</span>
+                      <span className="text-sm font-mono font-black text-emerald-400">{formatCurrency(totalLowTouchRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5">
+                      <span className="text-xs text-slate-400 font-semibold">Total Usuários</span>
+                      <span className="text-sm font-mono font-black text-indigo-400">{formatNumber(totalLowTouchUsers)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: Pessoa Jurídica (PJ) */}
+                <div className="bg-sky-950/20 p-6 rounded-2xl border border-sky-500/10 flex flex-col justify-between text-left shadow-lg animate-none">
+                  <div>
+                    <span className="text-[9px] font-black text-sky-400 uppercase tracking-widest block mb-1">Pessoa Jurídica (PJ)</span>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">04 Verticais</h4>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Contas PJ</span>
+                      <span className="text-sm font-mono font-black text-white">{formatNumber(pjCount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Faturamento MRR</span>
+                      <span className="text-sm font-mono font-black text-sky-400">{formatCurrency(pjRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5">
+                      <span className="text-xs text-slate-400 font-semibold">Ticket Médio PJ</span>
+                      <span className="text-sm font-mono font-black text-slate-300">
+                        {formatCurrency(pjCount > 0 ? pjRevenue / pjCount : 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 3: Clientes PF */}
+                <div className="bg-purple-950/20 p-6 rounded-2xl border border-purple-500/10 flex flex-col justify-between text-left shadow-lg animate-none">
+                  <div>
+                    <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest block mb-1">Pessoa Física (PF)</span>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Carteira Pessoa Física</h4>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Contas PF</span>
+                      <span className="text-sm font-mono font-black text-white">{formatNumber(pfCount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-xs text-slate-400 font-semibold">Faturamento MRR</span>
+                      <span className="text-sm font-mono font-black text-purple-400">{formatCurrency(pfRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5">
+                      <span className="text-xs text-slate-400 font-semibold">Ticket Médio PF</span>
+                      <span className="text-sm font-mono font-black text-slate-300">
+                        {`R$ ${(pfCount > 0 ? (pfRevenue / pfCount) / 1000 : 0).toFixed(1).replace('.', ',')}K`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </motion.div>
+
+          {/* LISTA DAS VERTICAIS LOGO ABAIXO COM A QUINTA VERTICAL INCLUÍDA */}
           <div className="grid grid-cols-1 gap-6">
             {verticalOrder.map(vName => {
               const clients = groupedClients[vName] || [];
@@ -510,8 +1034,11 @@ export default function App() {
                     className="bg-slate-950/50 p-6 border-b border-white/5 flex items-center justify-between w-full hover:bg-slate-950/70 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-sky-400" />
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center",
+                        vName === 'CLIENTES PF' ? "bg-purple-500/10" : "bg-sky-500/10"
+                      )}>
+                        <Users className={cn("w-5 h-5", vName === 'CLIENTES PF' ? "text-purple-400" : "text-sky-400")} />
                       </div>
                       <div className="text-left">
                         <h2 className="text-lg font-black text-white uppercase tracking-tight">{vName}</h2>
@@ -547,6 +1074,7 @@ export default function App() {
                                 <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5">Cliente</th>
                                 <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 text-right text-sky-400">MRR</th>
                                 <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 text-right">Usuários</th>
+                                <th className="px-6 py-4 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 text-center w-40">Direcionamento</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -566,6 +1094,23 @@ export default function App() {
                                   <td className="px-6 py-3 border-b border-white/5 text-right font-mono text-xs font-bold text-slate-400">
                                     {formatNumber(client.users)}
                                   </td>
+                                  <td className="px-6 py-3 border-b border-white/5 text-center">
+                                    {vName !== 'CLIENTES PF' ? (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleTogglePromotion(client);
+                                        }}
+                                        className="h-7 px-2.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/25 text-sky-400 border border-sky-500/20 text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center mx-auto hover:scale-105 active:scale-95 cursor-pointer"
+                                        title="Mover conta para o dimensionamento de vendas (EV/GC)"
+                                      >
+                                        <ArrowUpRight className="w-3 w-3 mr-1 shrink-0" />
+                                        Mover Vendas
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-600 font-bold uppercase select-none">-</span>
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -579,72 +1124,117 @@ export default function App() {
             })}
           </div>
 
-          <motion.footer 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-12 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]"
-          >
-            <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none rotate-12">
-              <BarChart3 className="w-80 h-80 text-white" />
-            </div>
-            
-            <div className="relative z-10">
-              <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-10">
-                <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-500/20">
-                      <TrendingUp className="w-6 h-6 text-emerald-400" />
+          {/* CLIENTES PROMOVIDOS INTEGRADOS */}
+          {promotedClients.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-slate-900/25 border border-indigo-500/20 rounded-3xl overflow-hidden flex flex-col shadow-xl mt-6 relative"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-[0.05] pointer-events-none">
+                <ShieldCheck className="w-24 h-24 text-indigo-400" />
+              </div>
+
+              <button 
+                onClick={() => setExpandedPromotedList(!expandedPromotedList)}
+                className="bg-indigo-950/20 p-6 border-b border-indigo-500/20 flex items-center justify-between w-full hover:bg-indigo-950/30 transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+                    <TrendingUp className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-indigo-300 uppercase tracking-tight">Clientes Promovidos para o Time de Vendas</h2>
+                    <div className="flex items-center space-x-3 mt-0.5">
+                      <p className="text-[10px] font-bold text-indigo-450 uppercase tracking-widest">{promotedClients.length} Contas Promovidas</p>
+                      <span className="text-indigo-800 font-black text-[10px]">•</span>
+                      <p className="text-[10px] font-bold text-emerald-450 uppercase tracking-widest">
+                        {formatCurrency(promotedClients.reduce((acc, c) => acc + c.revenue, 0))} Total Abatido
+                      </p>
                     </div>
-                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Consolidado Low-Touch</h3>
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] max-w-md ml-1">
-                    Métricas agregadas de todas as verticais para a categoria comercial complementar.
-                  </p>
-                </div>
-                
-                <div className="flex items-center bg-slate-950/80 rounded-2xl border border-white/5 p-2 px-6 shadow-xl">
-                  <div className="flex flex-col border-r border-white/5 pr-8 py-2">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Ticket Médio Low</span>
-                    <span className="text-xl font-black text-white text-center">
-                      {formatCurrency(lowTouchClients.length > 0 ? totalLowTouchRevenue / lowTouchClients.length : 0)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col pl-8 py-2">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Usuários / Cliente</span>
-                    <span className="text-xl font-black text-white text-center">
-                      {(lowTouchClients.length > 0 ? totalLowTouchUsers / lowTouchClients.length : 0).toFixed(1)}
-                    </span>
                   </div>
                 </div>
-              </div>
+                <div className="flex items-center space-x-2 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors">
+                  <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">{expandedPromotedList ? 'Ocultar' : 'Visualizar'}</span>
+                  <div className={cn("transition-transform duration-350", expandedPromotedList && "rotate-180")}>
+                    <ChevronDown className="w-4 h-4 text-indigo-400" />
+                  </div>
+                </div>
+              </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-sky-500/30 transition-colors">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Contas Totais</span>
-                  <span className="text-5xl font-black text-white group-hover:text-sky-400 transition-colors">{formatNumber(lowTouchClients.length)}</span>
-                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-sky-500 w-full opacity-50" />
-                  </div>
-                </div>
-                
-                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-indigo-500/30 transition-colors">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Base de Usuários</span>
-                  <span className="text-5xl font-black text-white group-hover:text-indigo-400 transition-colors">{formatNumber(totalLowTouchUsers)}</span>
-                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-indigo-500 w-full opacity-50" />
-                  </div>
-                </div>
+              <AnimatePresence>
+                {expandedPromotedList && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-6 space-y-4">
+                      <p className="text-xs text-slate-400 leading-relaxed font-semibold">
+                        Estes clientes de perfil Low-Touch foram promovidos manualmente. Suas receitas e contas foram **abatidas dos totais do Low-Touch** e **somadas nas respectivas verticais** da aba de **Time de Vendas (EV/GC)**, recalculando dinamicamente o faturamento e o headcount necessário das equipes corporativas.
+                      </p>
+                      
+                      <div className="overflow-x-auto border border-white/5 rounded-2xl bg-slate-950/40">
+                        <table className="w-full text-left border-collapse min-w-[700px]">
+                          <thead>
+                            <tr className="bg-slate-950/40">
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 w-12 text-center">#</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5">Vertical Origem</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5">Cliente</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 text-right text-emerald-400">MRR</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 text-right">Usuários</th>
+                              <th className="px-6 py-4 text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 text-center w-40">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {promotedClients.map((client, idx) => (
+                              <tr key={idx} className="group hover:bg-indigo-500/[0.03] transition-colors border-b border-white/5 last:border-0">
+                                <td className="px-6 py-3 text-center text-[10px] font-black text-indigo-500">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-6 py-3">
+                                  <span className="text-[10px] font-black bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded text-indigo-300 block w-fit uppercase">
+                                    {client.vertical}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3">
+                                  <span className="text-xs font-black text-white uppercase transition-colors block truncate max-w-xs font-semibold">
+                                    {client.name}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3 text-right font-mono text-xs font-bold text-slate-300">
+                                  {formatCurrency(client.revenue)}
+                                </td>
+                                <td className="px-6 py-3 text-right font-mono text-xs font-bold text-slate-400">
+                                  {formatNumber(client.users)}
+                                </td>
+                                <td className="px-6 py-3 text-center">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTogglePromotion(client);
+                                    }}
+                                    className="h-7 px-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center mx-auto hover:scale-105 active:scale-95 cursor-pointer"
+                                    title="Retornar cliente para o Low-Touch"
+                                  >
+                                    <Undo className="w-3 w-3 mr-1 shrink-0" />
+                                    Devolver Low-Touch
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
 
-                <div className="bg-slate-900 p-6 rounded-[2rem] border border-white/5 flex flex-col justify-center items-center text-center group hover:border-emerald-500/30 transition-colors md:col-span-2 lg:col-span-1">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">MRR Consolidado</span>
-                  <span className="text-5xl font-black text-emerald-400 group-hover:scale-105 transition-transform">{formatCurrency(totalLowTouchRevenue)}</span>
-                  <div className="w-full h-1 bg-white/5 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-full opacity-50" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.footer>
         </div>
       </div>
     );
@@ -723,7 +1313,7 @@ export default function App() {
                 </div>
 
                 <p className="text-xs text-slate-400 leading-relaxed font-semibold text-left">
-                  Bifurcação estratégia da força de vendas para expansão e retenção da base instalada.
+                  Bifuracação estratégica da força de vendas para expansão e retenção da base instalada.
                 </p>
 
                 <div className="border-t border-white/5 pt-4 space-y-2.5 text-left">
@@ -746,10 +1336,10 @@ export default function App() {
 
               <div className="mt-6 pt-4 border-t border-white/5 text-left">
                 <button
-                  onClick={() => setCurrentView('organograma')}
-                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                  onClick={() => setCurrentView('tres_papeis')}
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20"
                 >
-                  <span>Ver Organograma Geral</span>
+                  <span>Conheça os 03 papéis de Vendas</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -872,12 +1462,12 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-white/5 text-left">
+              <div className="mt-6 pt-4 border-t border-white/5 space-y-2 text-left">
                 <button
-                  onClick={() => setCurrentView('low_touch')}
-                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                  onClick={() => setCurrentView('performance_cs')}
+                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/15 hover:shadow-purple-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-purple-500/20 shadow-xl"
                 >
-                  <span>Analisar Clientes Low-Touch (≤ 10k)</span>
+                  <span>Como Calcular Performance CS</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -1068,137 +1658,192 @@ export default function App() {
     );
   };
 
-  const renderOrganograma = () => (
-    <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
-      <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
-        <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-rose-400 bg-clip-text text-transparent">
-          Estrutura Organizacional
-        </h1>
-      </header>
+  const renderOrganograma = () => {
+    // Calculate total headcount of all roles on the page
+    const fixedHeadsCount = 1.0; // 1.0 for Customer Success Leader
+    const directorCount = 1.0; // 1.0 for Diretor Comercial
+    const sumGRAll = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'].reduce((acc, key) => acc + (salesHCState[key]?.gr || 0), 0);
+    const sumEVAll = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'].reduce((acc, key) => acc + (salesHCState[key]?.ev || 0), 0);
+    const sumGCAll = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'].reduce((acc, key) => acc + (salesHCState[key]?.gc || 0), 0);
+    const csSpecialistsCount = opStatsSummary.totalHC;
+    const hcLowTouchVal = parseFloat(hcLowTouch || '0');
+    const totalOrganogramaHC = directorCount + fixedHeadsCount + sumGRAll + sumEVAll + sumGCAll + csSpecialistsCount + hcLowTouchVal;
 
-      <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-12 overflow-auto custom-scrollbar relative scroll-smooth">
-        <div className="min-w-[1000px] flex flex-col items-center space-y-16">
-          
-          {/* Top Level: Diretor Comercial */}
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative"
-          >
-            <div className="bg-gradient-to-br from-rose-500 to-amber-500 p-[2px] rounded-2xl shadow-[0_0_30px_-5px_rgba(244,63,94,0.3)]">
-              <div className="bg-slate-950 rounded-[14px] px-10 py-6 border border-white/10 text-center">
-                <h3 className="text-xl font-black text-white uppercase">Diretor Comercial</h3>
-              </div>
-            </div>
-            {/* Main trunk down */}
-            <div className="absolute left-1/2 bottom-0 w-px h-16 bg-white/10 -translate-x-1/2 translate-y-full" />
-          </motion.div>
+    return (
+      <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden">
+        <header className="flex justify-between items-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+          <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-amber-400 to-rose-400 bg-clip-text text-transparent">
+            Estrutura Organizacional Ideal
+          </h1>
+          <div className="flex items-center space-x-3 bg-slate-900/60 border border-white/10 rounded-xl px-4 py-2">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Headcount Total:</span>
+            <span className="text-lg font-mono font-black text-amber-400">{totalOrganogramaHC.toFixed(1)} HC</span>
+          </div>
+        </header>
 
-          {/* Level 1: Verticals & CS */}
-          <div className="relative w-full">
-            {/* Horizontal connection line for all reporting units (Verticals + CS) */}
-            <div className="absolute top-0 left-[10%] right-[10%] h-px bg-white/10" />
+        <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-12 overflow-auto custom-scrollbar relative scroll-smooth">
+          <div className="min-w-[1000px] flex flex-col items-center space-y-16">
             
-            <div className="grid grid-cols-5 gap-8">
-              {/* Verticals */}
-              {[
-                { name: 'Financeiro I', color: 'from-sky-500 to-indigo-500', iconColor: 'text-sky-400' },
-                { name: 'Financeiro II', color: 'from-emerald-500 to-teal-500', iconColor: 'text-emerald-400' },
-                { name: 'Governo', color: 'from-amber-500 to-orange-500', iconColor: 'text-amber-400' },
-                { name: 'Agro/Corp', color: 'from-rose-500 to-pink-500', iconColor: 'text-rose-400' },
-                { name: 'Customer Success', color: 'from-indigo-500 to-purple-600', iconColor: 'text-indigo-400', isCS: true },
-              ].map((v, i) => (
-                <div key={v.name} className="flex flex-col items-center space-y-12">
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1 + i * 0.1 }}
-                    className="relative group"
-                  >
-                    {/* Connection to top trunk */}
-                    <div className="absolute left-1/2 top-0 w-px h-8 bg-white/10 -translate-x-1/2 -translate-y-full" />
-                    
-                    <div className={cn("bg-gradient-to-br p-[1px] rounded-xl shadow-lg transition-all group-hover:scale-105", v.color)}>
-                      <div className="bg-slate-900 rounded-[11px] px-6 py-4 text-center min-w-[180px]">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{v.isCS ? 'Unidade' : 'Vertical'}</p>
-                        <h4 className="text-sm font-black text-white uppercase truncate">{v.name}</h4>
-                        {!v.isCS && (
-                          <p className="text-[10px] font-black text-slate-400 mt-1">
-                            {formatNumber(data.verticals.find(vs => vs.vertical === v.name)?.totalClients || 0)} CONTAS
-                          </p>
-                        )}
-                        {v.isCS && (
-                          <div className="mt-2 pt-2 border-t border-white/5">
-                            <p className="text-[8px] text-indigo-400 font-bold uppercase leading-none">Direcionamento Funcional</p>
-                            <p className="text-[7px] text-slate-500 font-bold uppercase mt-1">Das Verticais</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Stem down */}
-                    <div className="absolute left-1/2 bottom-0 w-px h-12 bg-white/10 -translate-x-1/2 translate-y-full" />
-                  </motion.div>
+            {/* Top Level: Diretor Comercial */}
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative"
+            >
+              <div className="bg-gradient-to-br from-rose-500 to-amber-500 p-[2px] rounded-2xl shadow-[0_0_30px_-5px_rgba(244,63,94,0.3)]">
+                <div className="bg-slate-950 rounded-[14px] px-10 py-6 border border-white/10 text-center">
+                  <h3 className="text-xl font-black text-white uppercase">Diretor Comercial</h3>
+                  <div className="mt-1.5 flex justify-center">
+                    <span className="text-xs font-mono font-black text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded">
+                      1.0 HC
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Main trunk down */}
+              <div className="absolute left-1/2 bottom-0 w-px h-16 bg-white/10 -translate-x-1/2 translate-y-full" />
+            </motion.div>
 
-                  {/* Sub-level (Executivo or Specialists) */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 + i * 0.1 }}
-                    className={cn(
-                      "px-4 py-3 text-center min-w-[160px] border rounded-xl",
-                      v.isCS ? "bg-indigo-500/10 border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]" : "bg-slate-900/50 border-white/5"
-                    )}
-                  >
+            {/* Level 1: Verticals & CS */}
+            <div className="relative w-full">
+              {/* Horizontal connection line for all reporting units (Verticals + CS) */}
+              <div className="absolute top-0 left-[10%] right-[10%] h-px bg-white/10" />
+              
+              <div className="grid grid-cols-5 gap-8">
+                {/* Verticals */}
+                {[
+                  { name: 'Financeiro I', color: 'from-sky-500 to-indigo-500', iconColor: 'text-sky-400' },
+                  { name: 'Financeiro II', color: 'from-emerald-500 to-teal-500', iconColor: 'text-emerald-400' },
+                  { name: 'Governo', color: 'from-amber-500 to-orange-500', iconColor: 'text-amber-400' },
+                  { name: 'Agro/Corp', color: 'from-rose-500 to-pink-500', iconColor: 'text-rose-400' },
+                  { name: 'Customer Success', color: 'from-indigo-500 to-purple-600', iconColor: 'text-indigo-400', isCS: true },
+                ].map((v, i) => (
+                  <div key={v.name} className="flex flex-col items-center space-y-12">
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.1 + i * 0.1 }}
+                      className="relative group"
+                    >
+                      {/* Connection to top trunk */}
+                      <div className="absolute left-1/2 top-0 w-px h-8 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                      
+                      <div className={cn("bg-gradient-to-br p-[1px] rounded-xl shadow-lg transition-all group-hover:scale-105", v.color)}>
+                        <div className="bg-slate-900 rounded-[11px] px-6 py-4 text-center min-w-[180px]">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{v.isCS ? 'Unidade' : 'Vertical'}</p>
+                          <h4 className="text-sm font-black text-white uppercase truncate">{v.name}</h4>
+                          <div className="mt-2 flex flex-col gap-1 items-center">
+                            <span className="text-[9px] font-extrabold uppercase text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                              Líder Vertical: {v.isCS ? '1.0' : (salesHCState[v.name === 'Agro/Corp' ? 'AGRO/CORP' : v.name.toUpperCase()]?.gr || 0).toFixed(1)} HC
+                            </span>
+                          </div>
+                          {!v.isCS && (
+                            <p className="text-[10px] font-black text-slate-400 mt-1.5">
+                              {formatNumber(data.verticals.find(vs => vs.vertical === v.name)?.totalClients || 0)} CONTAS
+                            </p>
+                          )}
+                          {v.isCS && (
+                            <div className="mt-2 pt-2 border-t border-white/5">
+                              <p className="text-[8px] text-indigo-400 font-bold uppercase leading-none">Direcionamento Funcional</p>
+                              <p className="text-[7px] text-slate-500 font-bold uppercase mt-1">Das Verticais</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Stem down */}
+                      <div className="absolute left-1/2 bottom-0 w-px h-12 bg-white/10 -translate-x-1/2 translate-y-full" />
+                    </motion.div>
+ 
+                    {/* Level 2: Especialistas CS or Executivo de Vendas */}
                     {v.isCS ? (
-                      <>
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 + i * 0.1 }}
+                        className={cn(
+                          "px-4 py-3 text-center min-w-[160px] border rounded-xl bg-indigo-500/10 border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]"
+                        )}
+                      >
                         <div className="flex -space-x-1 justify-center mb-2">
                           {[1, 2].map(j => <Users key={j} className="w-3 h-3 text-indigo-400" />)}
                         </div>
                         <p className="text-[10px] font-black text-white uppercase tracking-tighter">Especialistas CS</p>
-                      </>
+                        <p className="text-xs font-mono font-black text-indigo-400 mt-1">
+                          {csSpecialistsCount.toFixed(1)} HC
+                        </p>
+                      </motion.div>
                     ) : (
-                      <>
-                        <Briefcase className={cn("w-4 h-4 mx-auto mb-2 opacity-50", v.iconColor)} />
-                        <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivo de Vendas</p>
-                      </>
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 + i * 0.1 }}
+                        className="relative"
+                      >
+                        <div className="px-4 py-3 text-center min-w-[160px] border rounded-xl bg-slate-900/50 border-white/5">
+                          <Briefcase className={cn("w-4 h-4 mx-auto mb-2 opacity-50", v.iconColor)} />
+                          <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivo de Vendas</p>
+                          {(() => {
+                            const verticalKey = v.name === 'Agro/Corp' ? 'AGRO/CORP' : v.name.toUpperCase();
+                            const evValue = salesHCState[verticalKey]?.ev || 0;
+                            return (
+                              <p className={cn("text-xs font-mono font-black mt-1", v.iconColor)}>
+                                {evValue.toFixed(1)} HC
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      </motion.div>
                     )}
-                  </motion.div>
+ 
+                    {/* Level 3: Clientes Low-Touch for CS OR Gerente de Contas for verticals */}
+                    {v.isCS ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="relative flex flex-col items-center"
+                      >
+                        {/* Connection to Specialists */}
+                        <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                        
+                        <div className="bg-slate-900 border border-indigo-500/20 px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
+                          <Monitor className="w-3 h-3 text-slate-400 mx-auto mb-2" />
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Clientes Low-Touch</p>
+                          <p className="text-xs font-mono font-black text-indigo-400 mt-1">
+                            {parseFloat(hcLowTouch || '0').toFixed(1)} HC
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="relative flex flex-col items-center"
+                      >
+                        {/* Connection to Executivo de Vendas */}
+                        <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
+                        
+                        <div className="bg-slate-900 border border-white/5 hover:border-slate-700/50 transition-colors px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
+                          <Users className={cn("w-3.5 h-3.5 mx-auto mb-2 opacity-50", v.iconColor)} />
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerente de Contas</p>
+                          {(() => {
+                            const verticalKey = v.name === 'Agro/Corp' ? 'AGRO/CORP' : v.name.toUpperCase();
+                            const gcValue = salesHCState[verticalKey]?.gc || 0;
+                            return (
+                              <p className={cn("text-xs font-mono font-black mt-1", v.iconColor)}>
+                                {gcValue.toFixed(1)} HC
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-                  {v.isCS ? (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.7 }}
-                      className="relative flex flex-col items-center"
-                    >
-                      {/* Connection to Specialists */}
-                      <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
-                      
-                      <div className="bg-slate-900 border border-indigo-500/20 px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
-                        <Monitor className="w-3 h-3 text-slate-400 mx-auto mb-2" />
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Clientes Low-Touch</p>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.7 }}
-                      className="relative flex flex-col items-center"
-                    >
-                      {/* Connection to Executivo de Vendas */}
-                      <div className="absolute top-0 left-1/2 w-px h-12 bg-white/10 -translate-x-1/2 -translate-y-full" />
-                      
-                      <div className="bg-slate-900 border border-white/5 hover:border-slate-700/50 transition-colors px-4 py-3 text-center min-w-[160px] rounded-xl shadow-lg">
-                        <Users className={cn("w-3.5 h-3.5 mx-auto mb-2 opacity-50", v.iconColor)} />
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerente de Contas</p>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              ))}
-            </div>
 
             {/* Matrix Direction Line: Functional guidance from Vertical Heads to CS */}
             <div className="absolute top-[68px] left-[10%] right-[10%] h-px border-t border-dashed border-indigo-500/30 pointer-events-none" />
@@ -1286,6 +1931,871 @@ export default function App() {
       </div>
     </div>
   );
+};
+
+  const renderTresPapeis = () => (
+    <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-5 shrink-0 shadow-2xl text-left">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-red-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+            Os Três Papéis de Vendas
+          </h1>
+          <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+            EV com meta financeira (ataque) · GC e CS com meta de defesa · CS com indicadores de saúde.
+          </p>
+        </div>
+      </header>
+
+      <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-6 md:p-8 overflow-auto custom-scrollbar relative scroll-smooth">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+          
+          {/* Card 1: Executivo de Vendas (EV) - ATAQUE */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-slate-905/70 hover:bg-slate-900/90 border border-red-500/10 hover:border-red-500/30 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+            style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full filter blur-2xl group-hover:bg-red-500/10 transition-colors pointer-events-none" />
+            
+            <div className="space-y-6">
+              {/* Badge & Label Container */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white bg-red-650 bg-red-650 bg-red-600 px-3 py-1 rounded-full shadow-lg shadow-red-600/20">
+                  Ataque
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  Foco Expansão
+                </span>
+              </div>
+
+              {/* Title & Subtitle */}
+              <div className="space-y-1.5 text-left">
+                <h3 className="text-xl font-black text-white group-hover:text-red-400 transition-colors uppercase tracking-tight leading-tight">
+                  Executivo de vendas (EV)
+                </h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">
+                  Novas receitas — novos CNPJs
+                </p>
+              </div>
+
+              {/* Internal Badge */}
+              <div className="text-left">
+                <span className="inline-block text-[11px] font-bold tracking-wide text-sky-400 bg-sky-400/10 border border-sky-400/20 px-3 py-1 rounded-lg">
+                  Meta 100% financeira
+                </span>
+              </div>
+
+              {/* Content Description */}
+              <p className="text-xs text-slate-300 leading-relaxed font-semibold text-left border-t border-white/5 pt-4">
+                Cota de ARR novo (novas vendas, expansão das carteiras, novos CNPJs). Meta 100% financeira – sem indicadores de processo no primeiro momento.
+              </p>
+            </div>
+
+            {/* Bottom Section */}
+            <div className="mt-8 pt-4 border-t border-white/5 text-left flex justify-between items-center">
+              <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Múltiplo de Desempenho</span>
+              <span className="font-mono text-xs font-black text-red-400 bg-red-400/10 px-2.5 py-1 rounded-md border border-red-400/20">
+                Múltiplo RV: <span className="text-white text-sm">3.0x</span> / tri
+              </span>
+            </div>
+          </motion.div>
+
+          {/* Card 2: Gerente de Contas (GC) - DEFESA */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-slate-905/70 hover:bg-slate-900/90 border border-emerald-500/10 hover:border-emerald-500/30 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+            style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full filter blur-2xl group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
+            
+            <div className="space-y-6">
+              {/* Badge & Label Container */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                  Defesa
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  Foco Retenção
+                </span>
+              </div>
+
+              {/* Title & Subtitle */}
+              <div className="space-y-1.5 text-left">
+                <h3 className="text-xl font-black text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight leading-tight">
+                  Gerente de contas (GC)
+                </h3>
+                <p className="text-xs text-emerald-400/85 font-bold uppercase tracking-wide">
+                  Retenção + upsell na carteira
+                </p>
+              </div>
+
+              {/* Internal Badge */}
+              <div className="text-left">
+                <span className="inline-block text-[11px] font-bold tracking-wide text-sky-400 bg-sky-400/10 border border-sky-400/20 px-3 py-1 rounded-lg">
+                  Meta 100% financeira
+                </span>
+              </div>
+
+              {/* Content Description */}
+              <p className="text-xs text-slate-300 leading-relaxed font-semibold text-left border-t border-white/5 pt-4">
+                Cota de NRR (Net Revenue Retention). Meta 100% financeira — o NRR já captura expansão, RETENÇÃO, churn, renovações e reajustes contratuais num único número auditável.
+              </p>
+            </div>
+
+            {/* Bottom Section */}
+            <div className="mt-8 pt-4 border-t border-white/5 text-left flex justify-between items-center">
+              <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Múltiplo de Desempenho</span>
+              <span className="font-mono text-xs font-black text-emerald-400 bg-emerald-400/10 px-2.5 py-1 rounded-md border border-emerald-400/20">
+                Múltiplo RV: <span className="text-white text-sm">2.1x</span> / tri
+              </span>
+            </div>
+          </motion.div>
+
+          {/* Card 3: Customer Success (CS) - DEFESA */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-slate-905/70 hover:bg-slate-900/90 border border-indigo-500/10 hover:border-indigo-500/30 transition-all rounded-3xl p-6 shadow-xl flex flex-col justify-between group relative overflow-hidden"
+            style={{ background: 'rgba(15, 23, 42, 0.6)' }}
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full filter blur-2xl group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+            
+            <div className="space-y-6">
+              {/* Badge & Label Container */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full">
+                  Defesa
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                  Foco Saúde
+                </span>
+              </div>
+
+              {/* Title & Subtitle */}
+              <div className="space-y-1.5 text-left">
+                <h3 className="text-xl font-black text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight leading-tight">
+                  Customer success (CS)
+                </h3>
+                <p className="text-xs text-indigo-400/80 font-bold uppercase tracking-wide">
+                  Saúde e engajamento da base
+                </p>
+              </div>
+
+              {/* Internal Badge */}
+              <div className="text-left">
+                <span className="inline-block text-[11px] font-bold tracking-wide text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 px-3 py-1 rounded-lg">
+                  Meta por indicadores
+                </span>
+              </div>
+
+              {/* Content Description */}
+              <p className="text-xs text-slate-300 leading-relaxed font-semibold text-left border-t border-white/5 pt-4">
+                Sem cota financeira direta. RV calculado sobre atingimento de indicadores de saúde — cada indicador tem um peso e um alvo definido no início do trimestre.
+              </p>
+
+              {/* Indicators Checklist */}
+              <div className="space-y-2.5 border-t border-white/5 pt-4 text-left">
+                {[
+                  { name: 'Engajamento (DAU/MAU)', pct: '25%', bg: 'bg-indigo-500' },
+                  { name: 'Não-uso (NAU)', pct: '25%', bg: 'bg-indigo-400' },
+                  { name: 'Indicações p/ upsell', pct: '30%', bg: 'bg-emerald-500' },
+                  { name: 'NPS Operacional', pct: '20%', bg: 'bg-purple-500' },
+                ].map((ind, i) => (
+                  <div key={i} className="flex flex-col space-y-1">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-slate-400 font-bold">{ind.name}</span>
+                      <span className="font-mono text-white font-black">{ind.pct}</span>
+                    </div>
+                    <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                      <div className={cn("h-full rounded-full transition-all duration-1000", ind.bg)} style={{ width: ind.pct }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Section */}
+            <div className="mt-8 pt-4 border-t border-white/5 text-left flex justify-between items-center">
+              <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider">Múltiplo de Desempenho</span>
+              <span className="font-mono text-xs font-black text-indigo-400 bg-indigo-400/10 px-2.5 py-1 rounded-md border border-indigo-400/20">
+                Múltiplo RV: <span className="text-white text-sm">1.2x</span> / tri
+              </span>
+            </div>
+          </motion.div>
+
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderEstruturaIdeal = () => {
+    const sumGRAll = ['FINANCEIRO I', 'FINANCEIRO II', 'GOVERNO', 'AGRO/CORP'].reduce((acc, key) => acc + (salesHCState[key]?.gr || 0), 0);
+    const hcNecessarioLiderVertical = 1.0 + sumGRAll; // 1.0 for CS leader and sumGRAll for Sales leaders
+    const hcNecessarioCS = opStatsSummary.totalHC;
+    const hcNecessarioVendas = salesTotals.totalHeadcount - sumGRAll; // EV/GC lines
+    const hcNecessarioLowTouch = parseFloat(hcLowTouch || '0');
+    const hcNecessarioTotal = hcNecessarioLiderVertical + hcNecessarioCS + hcNecessarioVendas + hcNecessarioLowTouch;
+
+    const hcAtualLiderVertical = parseFloat(hcLiderVertical || '0');
+    const hcAtualCS = parseFloat(hcOperational || '0');
+    const hcAtualVendas = parseFloat(hcVendas || '0');
+    const hcAtualLowTouch = parseFloat(hcLowTouchAtual || '0');
+    const hcAtualTotal = hcAtualLiderVertical + hcAtualCS + hcAtualVendas + hcAtualLowTouch;
+
+    const gapLiderVertical = hcNecessarioLiderVertical - hcAtualLiderVertical;
+    const gapCS = hcNecessarioCS - hcAtualCS;
+    const gapVendas = hcNecessarioVendas - hcAtualVendas;
+    const gapLowTouch = hcNecessarioLowTouch - hcAtualLowTouch;
+    const gapTotal = hcNecessarioTotal - hcAtualTotal;
+
+    return (
+      <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-5 shrink-0 shadow-2xl text-left">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-teal-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
+              Estrutura Ideal de Headcount
+            </h1>
+            <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+              Painel consolidado comparando a força de trabalho atual com o headcount necessário projetado por sizing de Customer Success e Vendas.
+            </p>
+          </div>
+        </header>
+
+        <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-6 md:p-8 overflow-auto custom-scrollbar relative">
+          <div className="max-w-4xl mx-auto space-y-8">
+            
+            {/* Top Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Card 1: Headcount Necessário */}
+              <motion.div 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-900/60 border border-emerald-500/10 rounded-2xl p-6 shadow-xl relative text-left"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/25">
+                    <Target className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Sizing</span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Headcount Necessário</span>
+                <span className="text-4xl font-black text-white font-mono leading-none">{hcNecessarioTotal.toFixed(1)}</span>
+                <p className="text-[10px] text-slate-500 font-bold mt-2.5 pt-2 border-t border-white/5">
+                  Líderes ({hcNecessarioLiderVertical.toFixed(1)}) + CS ({hcNecessarioCS.toFixed(1)}) + Vendas ({hcNecessarioVendas.toFixed(1)}) + Low-Touch ({hcNecessarioLowTouch.toFixed(1)})
+                </p>
+              </motion.div>
+
+              {/* Card 2: Headcount Atual */}
+              <motion.div 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                className="bg-slate-900/60 border border-sky-500/10 rounded-2xl p-6 shadow-xl relative text-left"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-10 h-10 bg-sky-500/10 rounded-xl flex items-center justify-center border border-sky-500/25">
+                    <Users className="w-5 h-5 text-sky-400" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Atual</span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Headcount Atual</span>
+                <span className="text-4xl font-black text-white font-mono leading-none">{hcAtualTotal.toFixed(1)}</span>
+                <p className="text-[10px] text-slate-500 font-bold mt-2.5 pt-2 border-t border-white/5">
+                  Líderes ({hcAtualLiderVertical.toFixed(1)}) + CS ({hcAtualCS.toFixed(1)}) + Vendas ({hcAtualVendas.toFixed(1)}) + Low-Touch ({hcAtualLowTouch.toFixed(1)})
+                </p>
+              </motion.div>
+
+              {/* Card 3: GAP */}
+              <motion.div 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className={cn(
+                  "border rounded-2xl p-6 shadow-xl relative text-left",
+                  gapTotal > 0 
+                    ? "bg-slate-900/60 border-amber-500/10" 
+                    : "bg-slate-900/60 border-emerald-500/10"
+                )}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center border",
+                    gapTotal > 0 ? "bg-amber-500/10 border-amber-500/25" : "bg-emerald-500/10 border-emerald-500/25"
+                  )}>
+                    <Scale className={cn("w-5 h-5", gapTotal > 0 ? "text-amber-400" : "text-emerald-400")} />
+                  </div>
+                  <span className={cn(
+                    "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border",
+                    gapTotal > 0 ? "text-amber-400 bg-amber-500/10 border-amber-500/20" : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                  )}>
+                    {gapTotal > 0 ? 'Déficit' : 'Alinhado'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">GAP Total</span>
+                <span className={cn("text-4xl font-black font-mono leading-none", gapTotal > 0 ? "text-amber-400" : "text-emerald-400")}>
+                  {gapTotal > 0 ? `+${gapTotal.toFixed(1)}` : gapTotal.toFixed(1)}
+                </span>
+                <p className="text-[10px] text-slate-500 font-bold mt-2.5 pt-2 border-t border-white/5">
+                  {gapTotal > 0 ? 'Profissionais a contratar' : 'Headcount suficiente'}
+                </p>
+              </motion.div>
+
+            </div>
+
+            {/* Visual Progress Bar Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 text-left"
+            >
+              <h3 className="text-sm font-black text-white uppercase tracking-tight mb-4">Aderência aos Objetivos de Headcount</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span className="text-slate-400">Progresso do Preenchimento de Vagas</span>
+                    <span className="text-white font-mono font-bold">
+                      {hcNecessarioTotal > 0 ? Math.round((hcAtualTotal / hcNecessarioTotal) * 100) : 100}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-950/80 rounded-full h-3.5 p-0.5 border border-white/5">
+                    <div 
+                      className="bg-gradient-to-r from-sky-500 to-emerald-500 h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, hcNecessarioTotal > 0 ? (hcAtualTotal / hcNecessarioTotal) * 100 : 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Detailed Table & Control Center */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 md:p-8"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 text-left">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Detalhamento Comparativo</span>
+                  <h2 className="text-lg font-black text-white uppercase tracking-tight">Divisão por frente de negócio</h2>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto w-full">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 pb-2 text-[10px] text-slate-500 uppercase font-black tracking-wider text-center">
+                      <th className="text-left pb-4 font-black">Área de Sizing</th>
+                      <th className="pb-4 font-black">Headcount Necessário</th>
+                      <th className="pb-4 font-black">Headcount Atual</th>
+                      <th className="pb-4 font-black">Ajustar Atual</th>
+                      <th className="pb-4 font-black">GAP</th>
+                      <th className="pb-4 font-black">Status de Cobertura</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-center">
+                    
+                    {/* Líder Vertical Row */}
+                    <tr className="group hover:bg-white/[0.01] transition-colors">
+                      <td className="py-5 pr-4 text-left">
+                        <div className="flex items-center space-x-3 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/15">
+                            <Briefcase className="w-4 h-4 text-amber-400" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-bold text-white block">Líder Vertical</span>
+                            <span className="text-[10px] text-slate-500 font-semibold block uppercase">CS e Vendas (Liderança)</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-5 font-mono text-sm font-black text-white">
+                        {hcNecessarioLiderVertical.toFixed(1)}
+                      </td>
+                      <td className="py-5 font-mono text-sm font-bold text-slate-400">
+                        {hcAtualLiderVertical.toFixed(1)}
+                      </td>
+                      <td className="py-5">
+                        <div className="inline-flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = Math.max(0, hcAtualLiderVertical - 0.5);
+                              setHcLiderVertical(next.toFixed(1));
+                              saveHcLiderVertical(next.toFixed(1));
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={hcLiderVertical}
+                            onChange={(e) => {
+                              setHcLiderVertical(e.target.value);
+                              saveHcLiderVertical(e.target.value);
+                            }}
+                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = hcAtualLiderVertical + 0.5;
+                              setHcLiderVertical(next.toFixed(1));
+                              saveHcLiderVertical(next.toFixed(1));
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-xs font-mono font-black px-2.5 py-1 rounded-md",
+                          gapLiderVertical > 0 ? "text-amber-400 bg-amber-500/10" : "text-emerald-400 bg-emerald-500/10"
+                        )}>
+                          {gapLiderVertical > 0 ? `+${gapLiderVertical.toFixed(1)}` : gapLiderVertical.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border",
+                          gapLiderVertical > 0 ? "text-amber-400 border-amber-500/20 bg-amber-500/5" : "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                        )}>
+                          {gapLiderVertical > 0 ? 'Contratar' : 'Completo'}
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* CS Row */}
+                    <tr className="group hover:bg-white/[0.01] transition-colors">
+                      <td className="py-5 pr-4 text-left">
+                        <div className="flex items-center space-x-3 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/15">
+                            <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-bold text-white block">Customer Success</span>
+                            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Atendimento Operacional</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-5 font-mono text-sm font-black text-white">
+                        {hcNecessarioCS.toFixed(1)}
+                      </td>
+                      <td className="py-5 font-mono text-sm font-bold text-slate-400">
+                        {hcAtualCS.toFixed(1)}
+                      </td>
+                      <td className="py-5">
+                        <div className="inline-flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = Math.max(0, hcAtualCS - 0.5);
+                              setHcOperational(next.toFixed(1));
+                              localStorage.setItem('hc_operational', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_operational: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={hcOperational}
+                            onChange={(e) => {
+                              setHcOperational(e.target.value);
+                              localStorage.setItem('hc_operational', e.target.value);
+                              globalSettingsService.saveGlobalSettings({ hc_operational: e.target.value }).catch(console.error);
+                            }}
+                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = hcAtualCS + 0.5;
+                              setHcOperational(next.toFixed(1));
+                              localStorage.setItem('hc_operational', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_operational: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-xs font-mono font-black px-2.5 py-1 rounded-md",
+                          gapCS > 0 ? "text-amber-400 bg-amber-500/10" : "text-emerald-400 bg-emerald-500/10"
+                        )}>
+                          {gapCS > 0 ? `+${gapCS.toFixed(1)}` : gapCS.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border",
+                          gapCS > 0 ? "text-amber-400 border-amber-500/20 bg-amber-500/5" : "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                        )}>
+                          {gapCS > 0 ? 'Contratar' : 'Completo'}
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Vendas Row */}
+                    <tr className="group hover:bg-white/[0.01] transition-colors">
+                      <td className="py-5 pr-4 text-left">
+                        <div className="flex items-center space-x-3 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/15">
+                            <Users className="w-4 h-4 text-emerald-400" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-bold text-white block">Time de Vendas (EV/GC)</span>
+                            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Canais e Verticais Comerciais</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-5 font-mono text-sm font-black text-white">
+                        {hcNecessarioVendas.toFixed(1)}
+                      </td>
+                      <td className="py-5 font-mono text-sm font-bold text-slate-400">
+                        {hcAtualVendas.toFixed(1)}
+                      </td>
+                      <td className="py-5">
+                        <div className="inline-flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = Math.max(0, hcAtualVendas - 0.5);
+                              setHcVendas(next.toFixed(1));
+                              localStorage.setItem('hc_vendas', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_vendas: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={hcVendas}
+                            onChange={(e) => {
+                              setHcVendas(e.target.value);
+                              localStorage.setItem('hc_vendas', e.target.value);
+                              globalSettingsService.saveGlobalSettings({ hc_vendas: e.target.value }).catch(console.error);
+                            }}
+                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = hcAtualVendas + 0.5;
+                              setHcVendas(next.toFixed(1));
+                              localStorage.setItem('hc_vendas', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_vendas: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-xs font-mono font-black px-2.5 py-1 rounded-md",
+                          gapVendas > 0 ? "text-amber-400 bg-amber-500/10" : "text-emerald-400 bg-emerald-500/10"
+                        )}>
+                          {gapVendas > 0 ? `+${gapVendas.toFixed(1)}` : gapVendas.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border",
+                          gapVendas > 0 ? "text-amber-400 border-amber-500/20 bg-amber-500/5" : "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                        )}>
+                          {gapVendas > 0 ? 'Contratar' : 'Completo'}
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Atendimento Clientes Low-Touch Row */}
+                    <tr className="group hover:bg-white/[0.01] transition-colors">
+                      <td className="py-5 pr-4 text-left">
+                        <div className="flex items-center space-x-3 text-left">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/15">
+                            <Monitor className="w-4 h-4 text-indigo-400" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-bold text-white block">Atendimento Clientes Low-Touch</span>
+                            <span className="text-[10px] text-slate-500 font-semibold block uppercase">CS Digital & Suporte Consolidado</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-5 font-mono text-sm font-black text-white">
+                        {hcNecessarioLowTouch.toFixed(1)}
+                      </td>
+                      <td className="py-5 font-mono text-sm font-bold text-slate-400">
+                        {hcAtualLowTouch.toFixed(1)}
+                      </td>
+                      <td className="py-5">
+                        <div className="inline-flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = Math.max(0, hcAtualLowTouch - 0.5);
+                              setHcLowTouchAtual(next.toFixed(1));
+                              localStorage.setItem('hc_low_touch_atual', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_low_touch_atual: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={hcLowTouchAtual}
+                            onChange={(e) => {
+                              setHcLowTouchAtual(e.target.value);
+                              localStorage.setItem('hc_low_touch_atual', e.target.value);
+                              globalSettingsService.saveGlobalSettings({ hc_low_touch_atual: e.target.value }).catch(console.error);
+                            }}
+                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = hcAtualLowTouch + 0.5;
+                              setHcLowTouchAtual(next.toFixed(1));
+                              localStorage.setItem('hc_low_touch_atual', next.toFixed(1));
+                              globalSettingsService.saveGlobalSettings({ hc_low_touch_atual: next.toFixed(1) }).catch(console.error);
+                            }}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-xs font-mono font-black px-2.5 py-1 rounded-md",
+                          gapLowTouch > 0 ? "text-amber-400 bg-amber-500/10" : "text-emerald-400 bg-emerald-500/10"
+                        )}>
+                          {gapLowTouch > 0 ? `+${gapLowTouch.toFixed(1)}` : gapLowTouch.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border",
+                          gapLowTouch > 0 ? "text-amber-400 border-amber-500/20 bg-amber-500/5" : "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                        )}>
+                          {gapLowTouch > 0 ? 'Contratar' : 'Completo'}
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Total Row */}
+                    <tr className="bg-indigo-950/10 font-bold">
+                      <td className="py-5 text-left pl-4">
+                        <span className="text-sm font-black text-white uppercase tracking-tight">TOTAL CONSOLIDADO</span>
+                      </td>
+                      <td className="py-5 font-mono text-base font-black text-white">
+                        {hcNecessarioTotal.toFixed(1)}
+                      </td>
+                      <td className="py-5 font-mono text-base font-bold text-slate-400">
+                        {hcAtualTotal.toFixed(1)}
+                      </td>
+                      <td className="py-5">
+                        <span className="text-xs text-slate-500 font-bold">-</span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-sm font-mono font-black px-2.5 py-1 rounded-md",
+                          gapTotal > 0 ? "text-amber-400 bg-amber-500/20" : "text-emerald-400 bg-emerald-500/20"
+                        )}>
+                          {gapTotal > 0 ? `+${gapTotal.toFixed(1)}` : gapTotal.toFixed(1)}
+                        </span>
+                      </td>
+                      <td className="py-5">
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border",
+                          gapTotal > 0 ? "text-amber-400 border-amber-500/30 bg-amber-500/10" : "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                        )}>
+                          {gapTotal > 0 ? 'Déficit Geral' : 'Cobertura Ideal'}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </motion.div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPerformanceCS = () => {
+    const handleRealizedChange = (id: string, value: string) => {
+      const numericValue = parseFloat(value) || 0;
+      const nextIndicators = csIndicators.map(ind => 
+        ind.id === id 
+          ? { ...ind, realized: parseFloat(value) === 0 ? 0 : numericValue } 
+          : ind
+      );
+      setCsIndicators(nextIndicators);
+      localStorage.setItem('cs_indicators', JSON.stringify(nextIndicators));
+      if (user) {
+        globalSettingsService.saveGlobalSettings({
+          cs_indicators: JSON.stringify(nextIndicators)
+        }).catch(console.error);
+      }
+    };
+
+    // Calculations
+    const calculatedIndicators = csIndicators.map(ind => {
+      const atingimento = ind.target > 0 ? ind.realized / ind.target : 0;
+      const contrib_raw = atingimento * ind.weight;
+      return {
+        ...ind,
+        atingimento,
+        contrib_raw,
+      };
+    });
+
+    const atingimentoPonderadoTotal = calculatedIndicators.reduce((acc, curr) => acc + curr.contrib_raw, 0);
+    
+    // Formula matching (50%, 30%) to (100%, 100%):
+    // 0.3 + ((achievement - 0.5) / 0.5) * 0.7
+    const calculateStepFactor = (achievement: number) => {
+      if (achievement < 0.5) return 0;
+      return 0.3 + ((achievement - 0.5) / 0.5) * 0.7;
+    };
+
+    const stepFactor = calculateStepFactor(atingimentoPonderadoTotal);
+
+    return (
+      <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-5 shrink-0 shadow-2xl text-left">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-purple-400 via-indigo-400 to-sky-400 bg-clip-text text-transparent">
+              Cálculo de Performance - CS
+            </h1>
+            <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+              Demonstração detalhada de como calcular e simular a comissão e atingimento de metas do Customer Success.
+            </p>
+          </div>
+        </header>
+
+        <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-6 md:p-8 overflow-auto custom-scrollbar relative">
+          <div className="max-w-4xl mx-auto space-y-8">
+            
+            {/* Main Interactive Box */}
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden text-left"
+            >
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full filter blur-3xl pointer-events-none" />
+
+              {/* Title Section inside card */}
+              <div className="space-y-1 mb-6">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Modelo Operacional</span>
+                <h2 className="text-lg font-black text-white uppercase tracking-tight">Como calcular o atingimento do CS</h2>
+              </div>
+
+              {/* Purple Description Alert */}
+              <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-2xl p-4 md:p-5 mb-8">
+                <p className="text-xs text-indigo-300 font-semibold leading-relaxed">
+                  O CS não tem cota financeira. O atingimento trimestral é calculado como média ponderada dos indicadores — esse número entra na curva de degraus exatamente como o atingimento financeiro do EV e do GA.
+                </p>
+              </div>
+
+              {/* Responsive Table Card layout */}
+              <div className="overflow-x-auto w-full">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 pb-2 text-[10px] text-slate-500 uppercase font-black tracking-wider text-center">
+                      <th className="text-left pb-4 font-black">Indicador</th>
+                      <th className="pb-4 font-black">Peso</th>
+                      <th className="pb-4 font-black">Alvo do Trimestre</th>
+                      <th className="pb-4 font-black">Realizado</th>
+                      <th className="pb-4 font-black">Atingimento</th>
+                      <th className="pb-4 font-black">Contribuição</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {calculatedIndicators.map((ind) => (
+                      <tr key={ind.id} className="group hover:bg-white/[0.02] transition-colors">
+                        <td className="py-4 pr-4 text-left">
+                          <span className="text-sm font-bold text-white block">{ind.name}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-sm font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
+                            {(ind.weight * 100)}%
+                          </span>
+                        </td>
+                        <td className="py-4 text-center font-mono text-sm font-semibold text-slate-400">
+                          {ind.target}
+                        </td>
+                        <td className="py-4 text-center">
+                          <input 
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={ind.realized === 0 ? '' : ind.realized}
+                            placeholder="0"
+                            onChange={(e) => handleRealizedChange(ind.id, e.target.value)}
+                            className="w-20 px-2 py-1 text-center bg-slate-950/60 hover:bg-slate-950/90 focus:bg-slate-950 border border-white/10 focus:border-indigo-500/80 rounded-lg text-white font-mono text-sm font-bold transition-all outline-none"
+                          />
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-md">
+                            {Math.round(ind.atingimento * 100)}%
+                          </span>
+                        </td>
+                        <td className="py-4 text-center font-mono text-sm font-bold text-indigo-400">
+                          {(ind.contrib_raw * 100).toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Total Row */}
+                    <tr className="bg-indigo-950/10 font-bold">
+                      <td colSpan={5} className="py-5 text-left pl-2">
+                        <span className="text-sm font-black text-white uppercase tracking-tight">Atingimento ponderado total</span>
+                      </td>
+                      <td className="py-5 text-center font-mono text-lg font-black text-indigo-400">
+                        {(atingimentoPonderadoTotal * 100).toFixed(1)}%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+
+
+            </motion.div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderExecutivos = () => {
     const verticalMap: Record<string, Vertical> = {
@@ -1304,7 +2814,7 @@ export default function App() {
           </h1>
           <div className="mt-1">
             <span className="text-[10px] text-yellow-500 font-extrabold uppercase tracking-wide bg-yellow-500/10 px-2.5 py-1 rounded-[6px] border border-yellow-500/20 inline-block shadow-[0_2px_10px_rgba(234,179,8,0.05)]">
-              A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês
+              A lista/ranking abaixo, considera as contas com faturamento acima de R$ 10k/mês + contas selecionadas por critérios específicos pelo time de Vendas
             </span>
           </div>
         </div>
@@ -1315,7 +2825,14 @@ export default function App() {
             type="number"
             min="0"
             value={hcVendas}
-            onChange={(e) => setHcVendas(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setHcVendas(val);
+              localStorage.setItem('hc_vendas', val);
+              if (user) {
+                globalSettingsService.saveGlobalSettings({ hc_vendas: val }).catch(console.error);
+              }
+            }}
             className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
           />
           <button
@@ -1339,6 +2856,18 @@ export default function App() {
             value: salesTotals.totalClients, 
             sub: `${salesTotals.accountPercentage.toFixed(1)}% do total (${salesTotals.grandTotalAccounts})`,
             icon: Briefcase, color: 'text-sky-400', barColor: 'bg-sky-500' 
+          },
+          { 
+            label: 'Aderência Receita', 
+            value: formatCurrency(salesTotals.totalRevenue), 
+            sub: `${salesTotals.revenuePercentage.toFixed(1)}% da receita total`,
+            icon: DollarSign, color: 'text-indigo-400', barColor: 'bg-indigo-500' 
+          },
+          { 
+            label: 'Ticket Médio (Filtro)', 
+            value: formatCurrency(salesTotals.totalClients > 0 ? salesTotals.totalRevenue / salesTotals.totalClients : 0), 
+            sub: 'Baseado em contas > 10k',
+            icon: Target, color: 'text-amber-400', barColor: 'bg-amber-500' 
           },
           { 
             label: 'Headcount Necessário', 
@@ -1365,18 +2894,6 @@ export default function App() {
               );
             })()
           },
-          { 
-            label: 'Aderência Receita', 
-            value: formatCurrency(salesTotals.totalRevenue), 
-            sub: `${salesTotals.revenuePercentage.toFixed(1)}% da receita total`,
-            icon: DollarSign, color: 'text-indigo-400', barColor: 'bg-indigo-500' 
-          },
-          { 
-            label: 'Ticket Médio (Filtro)', 
-            value: formatCurrency(salesTotals.totalClients > 0 ? salesTotals.totalRevenue / salesTotals.totalClients : 0), 
-            sub: 'Baseado em contas > 10k',
-            icon: Target, color: 'text-amber-400', barColor: 'bg-amber-500' 
-          },
         ].map((stat, i) => (
           <div key={i} className="bg-slate-950 border border-white/10 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all hover:border-white/20">
             <div className={cn("absolute right-0 top-0 w-1 h-full", stat.barColor)} />
@@ -1398,7 +2915,10 @@ export default function App() {
             totalRevenue: number, 
             headcount: number,
             fixedHC: number,
-            variableHC: number
+            variableHC: number,
+            gr: number,
+            ev: number,
+            gc: number
           }]>).map(([v, data]) => {
             const revenueParticipation = (data.totalRevenue / salesTotals.totalRevenue) * 100;
 
@@ -1452,37 +2972,108 @@ export default function App() {
                         <p className="text-base font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-lg inline-block border border-emerald-500/20">{data.headcount.toFixed(1)}</p>
                       </div>
                     </div>
+
+                    {/* Sizing inputs for Líder, EV and GC */}
+                    <div className="bg-slate-950/35 p-3.5 rounded-2xl border border-white/5 space-y-3 shadow-inner">
+                      {/* Líder Vertical Selection row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] font-black uppercase text-slate-300">Líder Vertical</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Liderança / Vertical</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'gr', parseFloat(Math.max(0, data.gr - 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={data.gr}
+                            onChange={(e) => updateSalesHC(v, 'gr', parseFloat(e.target.value) || 0)}
+                            className="w-11 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'gr', parseFloat((data.gr + 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* EV Selection row */}
+                      <div className="flex items-center justify-between pt-2.5 border-t border-white/5">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] font-black uppercase text-slate-300">Executivo de Vendas (EV)</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Ataque / Proporcional</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'ev', parseFloat(Math.max(0, data.ev - 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={data.ev}
+                            onChange={(e) => updateSalesHC(v, 'ev', parseFloat(e.target.value) || 0)}
+                            className="w-11 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'ev', parseFloat((data.ev + 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* GC Selection row */}
+                      <div className="flex items-center justify-between pt-2.5 border-t border-white/5">
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] font-black uppercase text-slate-300">Gerente de Contas (GC)</span>
+                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Defesa / Dedicado</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5 bg-slate-950 rounded-lg p-0.5 border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'gc', parseFloat(Math.max(0, data.gc - 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={data.gc}
+                            onChange={(e) => updateSalesHC(v, 'gc', parseFloat(e.target.value) || 0)}
+                            className="w-11 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateSalesHC(v, 'gc', parseFloat((data.gc + 0.5).toFixed(1)))}
+                            className="w-6 h-6 rounded bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 text-xs font-black transition-all border border-white/5 flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     
                     <div className="space-y-4 flex-1">
                       <div className="space-y-3">
-                        {data.fixedHC > 0 ? (
-                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-col justify-center">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
-                                <ShieldCheck className="w-3 h-3 mr-1" />
-                                Fixed Headcount
-                              </span>
-                              <span className="text-[11px] font-black text-amber-400">{data.fixedHC.toFixed(1)}</span>
-                            </div>
-                            <p className="text-[9px] text-slate-500 font-medium leading-tight">
-                              {v === 'FINANCEIRO I' ? 'Bradesco e Itaú' : 'Banco do Brasil'} possuem HC dedicado.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-col justify-center">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-[9px] font-black text-amber-500 uppercase flex items-center">
-                                <ShieldCheck className="w-3 h-3 mr-1" />
-                                Fixed Headcount
-                              </span>
-                              <span className="text-[11px] font-black text-amber-400">0.0</span>
-                            </div>
-                            <p className="text-[9px] text-slate-500 font-medium leading-tight">
-                              Não há headcount fixo, apenas proporcional ao atendimento das contas.
-                            </p>
-                          </div>
-                        )}
-                        
                         <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 px-1 pt-1 opacity-80">
                           <span className="flex items-center">
                             <Users className="w-3 h-3 mr-1 opacity-50" />
@@ -1538,22 +3129,32 @@ export default function App() {
                       <div className="p-4 space-y-2 h-full overflow-auto custom-scrollbar scroll-smooth">
                         {data.clients.map((c, idx) => {
                           const isKeyAccount = ['BRADESCO', 'ITAU UNIBANCO', 'SANTANDER BRASIL', 'BANCO DO BRASIL'].includes(c.name.toUpperCase());
+                          const isPromotedLowTouch = c.revenue <= 10000.01;
                           return (
                             <div key={idx} className={cn(
                               "border rounded-xl p-3 flex justify-between items-center group transition-colors relative",
                               isKeyAccount 
                                 ? "bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]" 
+                                : isPromotedLowTouch 
+                                ? "bg-indigo-950/20 border-indigo-500/30 hover:bg-indigo-900/30 shadow-[0_2px_15px_rgba(99,102,241,0.1)]"
                                 : "bg-white/5 border-white/5 hover:bg-white/10"
                             )}>
                               <div className="flex items-center space-x-3 min-w-0">
                                 <span className={cn(
                                   "text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shrink-0",
-                                  isKeyAccount ? "bg-amber-500/30 text-amber-400" : "bg-white/5 text-slate-500"
+                                  isKeyAccount ? "bg-amber-500/30 text-amber-400" : isPromotedLowTouch ? "bg-indigo-500/30 text-indigo-300" : "bg-white/5 text-slate-500"
                                 )}>
                                   {idx + 1}
                                 </span>
                                 <div className="min-w-0">
-                                  <p className={cn("text-xs font-black truncate", isKeyAccount ? "text-amber-300" : "text-white")} title={c.name}>{c.name}</p>
+                                  <div className="flex items-center space-x-2">
+                                    <p className={cn("text-xs font-black truncate", isKeyAccount ? "text-amber-300" : "text-white")} title={c.name}>{c.name}</p>
+                                    {isPromotedLowTouch && (
+                                      <span className="text-[7px] font-black uppercase bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded tracking-wide shrink-0">
+                                        Low-Touch Promovido
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[9px] text-slate-500 font-bold uppercase">{formatNumber(c.users)} usuários</p>
                                 </div>
                               </div>
@@ -1665,13 +3266,20 @@ export default function App() {
     });
 
     setUnsavedVerticals(prev => new Set(prev).add(vertical));
-    setOpSettings(prev => ({
-      ...prev,
-      [vertical]: {
-        ...prev[vertical],
-        [field]: value
+    setOpSettings(prev => {
+      const next = {
+        ...prev,
+        [vertical]: {
+          ...prev[vertical],
+          [field]: value
+        }
+      };
+      localStorage.setItem('op_settings', JSON.stringify(next));
+      if (user && !error) {
+        verticalDataService.saveVertical(vertical, next[vertical], opParams[vertical]).catch(console.error);
       }
-    }));
+      return next;
+    });
   };
 
   const effortLevelLabels = ["Baixo", "Médio", "Alto", "Muito Alto"];
@@ -1710,10 +3318,17 @@ export default function App() {
     });
 
     setUnsavedVerticals(prev => new Set(prev).add(vertical));
-    setOpParams(prev => ({
-      ...prev,
-      [vertical]: { ...prev[vertical], [field]: value }
-    }));
+    setOpParams(prev => {
+      const next = {
+        ...prev,
+        [vertical]: { ...prev[vertical], [field]: value }
+      };
+      localStorage.setItem('op_params', JSON.stringify(next));
+      if (user && !error) {
+        verticalDataService.saveVertical(vertical, opSettings[vertical], next[vertical]).catch(console.error);
+      }
+      return next;
+    });
   };
 
   const renderDashboard = () => (
@@ -2236,7 +3851,14 @@ export default function App() {
             type="number"
             min="0"
             value={hcOperational}
-            onChange={(e) => setHcOperational(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setHcOperational(val);
+              localStorage.setItem('hc_operational', val);
+              if (user) {
+                globalSettingsService.saveGlobalSettings({ hc_operational: val }).catch(console.error);
+              }
+            }}
             className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
           />
           <button
@@ -2835,7 +4457,11 @@ export default function App() {
         </button>
 
         <div className={cn("p-6 pb-10", isSidebarCollapsed && "px-4")}>
-          <div className="flex items-center px-1 mb-10 overflow-hidden">
+          <div 
+            onClick={() => setCurrentView('premissas')}
+            className="flex items-center px-1 mb-10 overflow-hidden cursor-pointer hover:opacity-80 transition-all"
+            title="Voltar para Premissas"
+          >
             <div className="w-10 h-10 bg-gradient-to-br from-sky-400 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20 mr-4 shrink-0">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
@@ -2918,13 +4544,112 @@ export default function App() {
               )}
             </button>
 
+            {/* Estrutura Ideal */}
+            <button
+              onClick={() => setCurrentView('estrutura_ideal')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'estrutura_ideal'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'estrutura_ideal' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <Briefcase className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'estrutura_ideal' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Estrutura Ideal</span>
+              )}
+              {currentView === 'estrutura_ideal' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+
+            {/* Organograma */}
+            <button
+              onClick={() => setCurrentView('organograma')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'organograma'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'organograma' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <BarChart3 className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'organograma' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Organograma</span>
+              )}
+              {currentView === 'organograma' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+
+            {/* Os Três Papéis */}
+            <button
+              onClick={() => setCurrentView('tres_papeis')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'tres_papeis'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'tres_papeis' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <Target className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'tres_papeis' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Os Três Papéis</span>
+              )}
+              {currentView === 'tres_papeis' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
+
             {/* SIZING Accordion */}
             <div className="space-y-1">
               <button
                 onClick={() => setIsSizingExpanded(!isSizingExpanded)}
                 className={cn(
                   "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group relative",
-                  (currentView === 'operational' || currentView === 'executivos')
+                  (currentView === 'operational' || currentView === 'executivos' || currentView === 'low_touch')
                     ? "text-slate-200 bg-white/5"
                     : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
                 )}
@@ -2932,7 +4657,7 @@ export default function App() {
                 <div className="flex items-center">
                   <Scale className={cn(
                     "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
-                    (currentView === 'operational' || currentView === 'executivos')
+                    (currentView === 'operational' || currentView === 'executivos' || currentView === 'low_touch')
                       ? "text-sky-400"
                       : "group-hover:text-slate-400"
                   )} />
@@ -2954,6 +4679,7 @@ export default function App() {
                   {[
                     { id: 'operational', label: 'Customer Success', icon: ShieldCheck },
                     { id: 'executivos', label: 'Time de Vendas (EV/GC)', icon: Users },
+                    { id: 'low_touch', label: 'Clientes Low-touch', icon: Zap },
                   ].map((subItem) => (
                     <button
                       key={subItem.id}
@@ -2994,46 +4720,38 @@ export default function App() {
               )}
             </div>
 
-            {/* Clientes Low-touch and Organograma */}
-            {[
-              { id: 'low_touch', label: 'Clientes Low-touch', icon: Zap },
-              { id: 'organograma', label: 'Organograma', icon: BarChart3 },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id as View)}
-                className={cn(
-                  "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
-                  currentView === item.id 
-                    ? "text-white" 
-                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
-                )}
-              >
-                {currentView === item.id && (
-                  <motion.div 
-                    layoutId="activeNavBg"
-                    className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
-                    transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
-                  />
-                )}
-                
-                <item.icon className={cn(
-                  "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
-                  currentView === item.id ? "text-sky-400" : "group-hover:text-slate-400"
-                )} />
-                {!isSidebarCollapsed && (
-                  <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">{item.label}</span>
-                )}
-                
-                {currentView === item.id && (
-                  <motion.div 
-                    layoutId="activeNavStripe"
-                    className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-              </button>
-            ))}
+            {/* Performance CS */}
+            <button
+              onClick={() => setCurrentView('performance_cs')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative",
+                currentView === 'performance_cs'
+                  ? "text-white"
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+              )}
+            >
+              {currentView === 'performance_cs' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-white/10 rounded-xl shadow-lg shadow-black/20"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <ShieldCheck className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10",
+                currentView === 'performance_cs' ? "text-sky-400" : "group-hover:text-slate-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10">Performance CS</span>
+              )}
+              {currentView === 'performance_cs' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-sky-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
           </nav>
 
           {/* Sync Status */}
@@ -3095,6 +4813,17 @@ export default function App() {
             >
               {renderDashboard()}
             </motion.div>
+          ) : currentView === 'estrutura_ideal' ? (
+            <motion.div 
+              key="estrutura_ideal"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderEstruturaIdeal()}
+            </motion.div>
           ) : currentView === 'operational' ? (
             <motion.div 
               key="operational"
@@ -3128,7 +4857,7 @@ export default function App() {
             >
               {renderLowTouch()}
             </motion.div>
-          ) : (
+          ) : currentView === 'organograma' ? (
             <motion.div 
               key="organograma"
               initial={{ opacity: 0, y: 10 }}
@@ -3138,6 +4867,28 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
             >
               {renderOrganograma()}
+            </motion.div>
+          ) : currentView === 'tres_papeis' ? (
+            <motion.div 
+              key="tres_papeis"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderTresPapeis()}
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="performance_cs"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderPerformanceCS()}
             </motion.div>
           )}
         </AnimatePresence>

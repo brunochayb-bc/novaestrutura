@@ -46,13 +46,19 @@ service cloud.firestore {
 
     function isValidGlobalSettings(data) {
       return data.keys().hasAll(['execCapacity', 'updatedAt', 'passcode']) &&
-             data.keys().hasOnly(['updatedAt', 'passcode', 'execCapacity', 'hc_operational', 'hc_vendas']) &&
+             data.keys().hasOnly(['updatedAt', 'passcode', 'execCapacity', 'hc_operational', 'hc_vendas', 'hc_lider_vertical', 'hc_low_touch', 'hc_low_touch_atual', 'promoted_low_touch', 'sales_hc_state', 'cs_indicators']) &&
              data.execCapacity is number &&
              data.execCapacity > 0 &&
              data.updatedAt == request.time &&
              data.passcode == '270420262345' &&
-             (data.keys().hasAny(['hc_operational']) ? data.hc_operational is string : true) &&
-             (data.keys().hasAny(['hc_vendas']) ? data.hc_vendas is string : true);
+             (data.keys().hasAny(['hc_operational']) ? (data.hc_operational is string && data.hc_operational.size() <= 65536) : true) &&
+             (data.keys().hasAny(['hc_vendas']) ? (data.hc_vendas is string && data.hc_vendas.size() <= 65536) : true) &&
+             (data.keys().hasAny(['hc_lider_vertical']) ? (data.hc_lider_vertical is string && data.hc_lider_vertical.size() <= 65536) : true) &&
+             (data.keys().hasAny(['hc_low_touch']) ? (data.hc_low_touch is string && data.hc_low_touch.size() <= 65536) : true) &&
+             (data.keys().hasAny(['hc_low_touch_atual']) ? (data.hc_low_touch_atual is string && data.hc_low_touch_atual.size() <= 65536) : true) &&
+             (data.keys().hasAny(['promoted_low_touch']) ? (data.promoted_low_touch is string && data.promoted_low_touch.size() <= 65536) : true) &&
+             (data.keys().hasAny(['sales_hc_state']) ? (data.sales_hc_state is string && data.sales_hc_state.size() <= 65536) : true) &&
+             (data.keys().hasAny(['cs_indicators']) ? (data.cs_indicators is string && data.cs_indicators.size() <= 65536) : true);
     }
 
     /**
