@@ -2419,7 +2419,7 @@ export default function App() {
                               localStorage.setItem('hc_operational', e.target.value);
                               globalSettingsService.saveGlobalSettings({ hc_operational: e.target.value }).catch(console.error);
                             }}
-                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                            className="w-16 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
                           />
                           <button
                             type="button"
@@ -2496,7 +2496,7 @@ export default function App() {
                               localStorage.setItem('hc_vendas', e.target.value);
                               globalSettingsService.saveGlobalSettings({ hc_vendas: e.target.value }).catch(console.error);
                             }}
-                            className="w-12 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
+                            className="w-16 h-6 text-center bg-transparent text-white font-mono text-xs font-bold outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none animate-none"
                           />
                           <button
                             type="button"
@@ -2833,7 +2833,7 @@ export default function App() {
                 globalSettingsService.saveGlobalSettings({ hc_vendas: val }).catch(console.error);
               }
             }}
-            className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+            className="w-24 bg-slate-950/80 border border-white/10 rounded-lg px-3 py-1 text-center font-mono font-bold text-sm text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
           />
           <button
             onClick={saveHcVendas}
@@ -3859,7 +3859,7 @@ export default function App() {
                 globalSettingsService.saveGlobalSettings({ hc_operational: val }).catch(console.error);
               }
             }}
-            className="w-16 bg-slate-950/80 border border-white/10 rounded-lg px-2 py-1 text-center font-mono font-bold text-sm text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            className="w-24 bg-slate-950/80 border border-white/10 rounded-lg px-3 py-1 text-center font-mono font-bold text-sm text-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
           />
           <button
             onClick={saveHcOperational}
