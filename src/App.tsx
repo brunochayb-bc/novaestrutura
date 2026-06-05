@@ -1398,9 +1398,9 @@ export default function App() {
               <div className="mt-6 pt-4 border-t border-white/5 text-left">
                 <button
                   onClick={() => setCurrentView('executivos')}
-                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20"
                 >
-                  <span>Analisar Sizing de Vendas (EV/AM)</span>
+                  <span>Analisar Sizing de Vendas (EV/GC)</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -1465,7 +1465,7 @@ export default function App() {
               <div className="mt-6 pt-4 border-t border-white/5 space-y-2 text-left">
                 <button
                   onClick={() => setCurrentView('performance_cs')}
-                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/15 hover:shadow-purple-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-purple-500/20 shadow-xl"
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20"
                 >
                   <span>Como Calcular Performance CS</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1524,7 +1524,7 @@ export default function App() {
               <div className="mt-6 pt-4 border-t border-white/5 text-left">
                 <button
                   onClick={() => setCurrentView('operational')}
-                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20"
                 >
                   <span>Analisar Sizing de CS</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1597,7 +1597,7 @@ export default function App() {
                   href="https://rv-comercial-framework.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 text-white shadow-lg shadow-fuchsia-500/20 hover:shadow-fuchsia-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-fuchsia-500/30 text-center"
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20 text-center"
                 >
                   <span>Novo Modelo RV</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1644,7 +1644,7 @@ export default function App() {
               <div className="mt-6 pt-4 border-t border-white/5 text-left">
                 <button
                   onClick={() => setCurrentView('low_touch')}
-                  className="w-full py-2 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white border border-white/5 hover:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-1"
+                  className="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/15 hover:shadow-sky-500/25 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center space-x-2 border border-sky-500/20"
                 >
                   <span>Analisar Clientes Low-Touch (≤ 10k)</span>
                   <ArrowRight className="w-3.5 h-3.5" />
