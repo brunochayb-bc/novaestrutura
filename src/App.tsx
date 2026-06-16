@@ -2266,7 +2266,7 @@ export default function App() {
       planoASubView === 'financeiro' ? "Blindagem de base madura (70% Defesa) e expansão via novos módulos SaaS (30% Ataque)." :
       planoASubView === 'agro_corp' ? "Retenção de grandes contas corporate (80% Defesa) e novos logos no Agro (20% Ataque)." :
       planoASubView === 'governo' ? "Prospecção burocrática de licitações públicas com alta taxa de conversão (35% Defesa / 65% Ataque)." :
-      "Operação automatizada de escala com volume e baixo custo de aquisição (100% Ataque).";
+      "Operação automatizada de escala com volume e baixo custo de aquisição (80% Defesa / 20% Ataque).";
 
     return (
       <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden text-left">

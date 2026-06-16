@@ -101,6 +101,9 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
 
   const getValueStyle = (val: string) => {
     if (!val) return "";
+    if (val === 'Prioritário' || val === 'Prioritária') {
+      return "text-yellow-450 text-yellow-450 font-black bg-yellow-500/15 px-2.5 py-0.5 rounded-lg border border-yellow-500/30 shadow-inner";
+    }
     if (val === 'Sim') return "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20";
     if (val.includes('−30%') || val.includes('Redução') || val.includes('Mínimo')) {
       return "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20";
@@ -183,7 +186,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
       { name: 'Agro / Corp', Defesa: 80, Ataque: 20 },
       { name: 'Financeiro', Defesa: 70, Ataque: 30 },
       { name: 'Governo', Defesa: 35, Ataque: 65 },
-      { name: 'Low-Touch', Defesa: 0, Ataque: 100 },
+      { name: 'Low-Touch', Defesa: 80, Ataque: 20 },
     ];
 
     const directives = [
@@ -458,11 +461,13 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
 
           <div className="space-y-3">
             {[
-              { id: 'step1', title: 'Validar os pesos de defesa/ataque', subtitle: 'Especificamente alinhar os 35/65 de Governo e os 60/40 de Agro/Corp com lideranças comerciais.' },
-              { id: 'step2', title: 'Definir a linha de base de churn por vertical', subtitle: 'Calcular a linha de partida real de churn de seats para poder auditorar a meta de redução de 30%.' },
-              { id: 'step3', title: 'Popular o dashboard com a baseline real', subtitle: 'Atualizar todo o sistema com taxas reais de cobertura, NRR, churn, win rates e usuários não-ativos (NAU).' },
-              { id: 'step4', title: 'Nomear responsáveis por iniciativa', subtitle: 'Atribuir donos de projeto por vertical e classificar as contas prioritárias (Tiers 1 e 2) por donos de defesa e ataque.' },
-              { id: 'step5', title: 'Instrumentar o acompanhamento de NAU', subtitle: 'Configurar queries ou scripts automatizados para notificar sobre o desuso recorrente de licenças em grandes clientes.' },
+              { id: 'step1', title: 'Validar o modelo de Ataque/Defesa', subtitle: 'Definir share de participação da meta entre time de Ataque e Defesa (70/30)' },
+              { id: 'step2', title: 'Nomear responsáveis pela nova estrutura e o sizing do time', subtitle: 'Atribuir líderes das verticais e definir clientes top tier 1 e 2, bem como carteira low-touch' },
+              { id: 'step3', title: 'Definir dashboard com baseline real', subtitle: 'Atualizar as métricas com taxas reais de cobertura, NRR, churn, win-rates e usuários não-ativos (NAU)' },
+              { id: 'step4', title: 'Definir linha de base de churn por vertical', subtitle: 'Calcular linha de partida real de churn por vertical para auditar a meta de redução proposta' },
+              { id: 'step5', title: 'Instrumentar o acompanhamento de NAU', subtitle: 'Configurar rotinas para acompanhamento e controle sobre o desuso recorrente de licenças nos clientes das verticais' },
+              { id: 'step6', title: 'Definir os demais KPIs de cada vertical', subtitle: 'Mapear e documentar métricas adicionais de atividade operacional para as frentes de atendimento e pré-vendas' },
+              { id: 'step7', title: 'Montar o fluxo comercial para atendimento a clientes Low-Touch', subtitle: 'Desenhar fluxos de canais self-service automáticos e réguas de comunicação para clientes de baixo ticket' },
             ].map((step, idx) => {
               const checked = checklist[step.id];
               return (
@@ -526,12 +531,11 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3">
-              {renderEffortBadgeMini(70, 30)}
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
                 Vertical Financeiro comercial
               </h2>
               <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Mercado maduro, competitivo e altamente crítico. O foco principal é a <strong className="text-white">defesa agressiva</strong> contra vazamento de receita e churn no Tier 1, com expansão capturada via módulos adicionais de SaaS de alto valor.
+                Mercado maduro, competitivo e altamente crítico. O foco principal é a defesa contra vazamento de receita e churn no Tier 1, além da expansão capturada via módulos adicionais de SaaS de alto valor.
               </p>
             </div>
 
@@ -549,7 +553,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
         </div>
 
         {/* Diagnosis and Metrics Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
             <div className="space-y-4 text-left">
               <h3 className="text-md font-black text-white uppercase tracking-tight pb-3 border-b border-white/5 flex items-center gap-1.5">
@@ -579,9 +583,9 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
               <div className="space-y-3 pt-1">
                 {[
                   { kpi: "Cobertura de Pipeline", value: "3× ARR", desc: "Força de vendas focada em manter funil robusto." },
-                  { kpi: "Redução de Churn", value: "−30% Churn", desc: "Prioridade total em combater desistência de seats." },
+                  { kpi: "Redução de Churn", value: "20% Churn", desc: "prioridade total em combater cancelamento de usuários" },
                   { kpi: "Gestão de Clientes", value: "Health Score", desc: "Checkups dinâmicos nas ferramentas ativas." },
-                  { kpi: "SaaS Cross-Sell", value: "Expansão Tier 1", desc: "Módulos integrados diretamente ao workflow do cliente." },
+                  { kpi: "SaaS Cross-Sell", value: "Tier 1 & 2", desc: "soluções adaptadas ao workflow e necessidades dos clientes" },
                 ].map((m, i) => (
                   <div key={i} className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
                     <div>
@@ -596,79 +600,6 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
               </div>
             </div>
           </div>
-
-          {/* Dinâmicos Calculators / Simulators */}
-          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6">
-            <h3 className="text-md font-black text-white uppercase tracking-tight pb-3 border-b border-white/5 flex items-center gap-1.5 mb-4">
-              <TrendingUp className="w-4 h-4 text-indigo-400" />
-              Simulador Financeiro Inteligente
-            </h3>
-
-            <div className="space-y-4 text-xs font-medium">
-              <div>
-                <label className="text-slate-400 block mb-1">Base de Receita Recorrente (ARR)</label>
-                <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                  <span className="text-slate-500 font-mono mr-2">R$</span>
-                  <input
-                    type="number"
-                    value={finBaseARR}
-                    onChange={(e) => setFinBaseARR(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-450 text-slate-400 block mb-1">Churn Atual (%)</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <input
-                      type="number"
-                      value={finCurrentChurn}
-                      onChange={(e) => setFinCurrentChurn(Math.max(0, parseFloat(e.target.value) || 0))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                    <span className="text-slate-500 font-mono">%</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Volume de Pipeline</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <span className="text-slate-500 font-mono mr-1">R$</span>
-                    <input
-                      type="number"
-                      value={finPipeline}
-                      onChange={(e) => setFinPipeline(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic calculations results */}
-              <div className="bg-slate-950/70 p-4 rounded-xl border border-indigo-500/20 space-y-3 mt-4">
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-slate-400">Churn Meta (-30%):</span>
-                  <span className="text-emerald-400 font-mono font-bold">{targetChurnRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-slate-400">Economia Anualizada:</span>
-                  <span className="text-emerald-400 font-mono font-black">{formatBRL(moneySaved)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Cobertura Real / Meta:</span>
-                  <div className="text-right">
-                    <span className={cn(
-                      "font-mono font-black px-2 py-0.5 rounded text-[11px]",
-                      coverageRatioMeetsGoal ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                    )}>
-                      {coverageRatio.toFixed(1)}x / 3.0x
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Structural Initiatives & KPIs */}
@@ -679,7 +610,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
             </h3>
             <div className="space-y-4">
               {[
-                { title: "Mapeamento Rígido de Risco & NAU", desc: "Criar score de saúde automático. Contas em desuso de seats serão enviadas imediatamente ao squad de retenção prioritário da base." },
+                { title: "Mapeamento Rígido de Risco & NAU", desc: "criar score de saúde automático das contas. Usuários em desuso (NAU) serão constantemente monitorados por squads de retenção em parceria com o time de Customer Success." },
                 { title: "Trilha de Cross-Sell Automatizada", desc: "Mapeamento de workflow por atuação das áreas do cliente para impulsionar novos módulos de SaaS integrados com alto valor agregado." },
                 { title: "QBRs Sistemáticos de Relacionamento C-Level", desc: "Garantir reuniões periódicas de feedback estruturado nas contas Tier 1 e Tier 2 para blindagem prévia de concorrência." },
                 { title: "Baseline de Churn Consolidada", desc: "Definição formal de indicadores retroativos para garantir auditoria transparente do resultado de redução de perdas do pilar de defesa." },
@@ -705,10 +636,10 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
               {[
                 { kpi: "Nível de Rentabilidade (NRR)", desc: "Sustentado por ativação de NAU" },
                 { kpi: "Percentual Renovado (GRR)", desc: "Taxa bruta de base defendida" },
-                { kpi: "Churn de Seats (-30%)", desc: "Queda programada de perdas" },
-                { kpi: "Seats Reativados", desc: "Combate ao desuso (NAU)" },
+                { kpi: "Churn das Contas (20%)", desc: "Queda programada de perdas" },
+                { kpi: "Users Reativados", desc: "Combate ao desuso (NAU)" },
                 { kpi: "Expansão de SaaS", desc: "Venda de produtos de ecossistema" },
-                { kpi: "Multiplicação de Pipeline (3x)", desc: "Funil de vendas monitorado" },
+                { kpi: "Cobertura de Pipeline", desc: "Funil de vendas monitorado" },
                 { kpi: "Taxa de Win Rate", desc: "Conversão de novos módulos" },
               ].map((ind, i) => (
                 <div key={i} className="bg-slate-950/40 border border-white/5 p-3.5 rounded-xl flex flex-col justify-between">
@@ -741,12 +672,11 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3">
-              {renderEffortBadgeMini(60, 40)}
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
                 Vertical Agro / Corp comercial
               </h2>
               <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Grande potencial de caça e mercados sub-penetitados. O plano comercial foca em <strong className="text-white">equilíbrio ágil</strong>: manter a sólida base atual de clientes enquanto impulsionamos aquisições proativas de novos CNPJs por agricultura de safras e cross-sell SaaS corporativo.
+                Grande potencial de expansão em mercados sub-penetrados. O plano comercial foca em equilíbrio: manter a base atual de clientes enquanto impulsionamos aquisições de novos CNPJs e win-rate de novas soluções nos segmentos agro e corporativo. Foco em alinhamento estratégico com a área de Produtos.
               </p>
             </div>
 
@@ -764,7 +694,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
         </div>
 
         {/* Diagnosis and Metrics Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
             <div className="space-y-4 text-left">
               <h3 className="text-md font-black text-white uppercase tracking-tight pb-3 border-b border-white/5 flex items-center gap-1.5">
@@ -772,15 +702,12 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
                 Diagnóstico & Abordagem
               </h3>
               <p className="text-xs text-slate-350 leading-relaxed">
-                Mercados com TAM (Total Addressable Market) de Agro e Corporate ainda vastas e sem saturação total. Nossas soluções de software possuem diferenciais nítidos em relação à concorrência regional.
-              </p>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Exige um mecanismo agressivo de caça baseada em geolocalização e produtividade agrícola, sem descuidar da blindagem de contratos corporate de grande escala que representam alta fatia do ARR geral.
+                Mercados com TAM (Total Addressable Market) de Agro e Corporate ainda vastas e com potencial para novas ofertas em diferentes regiões. Definir estratégia por segmento de atuação/região geográfica. Diversificação de estratégia e receita por tipo de cliente.
               </p>
             </div>
             <div className="bg-emerald-950/20 border border-emerald-500/10 rounded-xl p-3 mt-4 text-xs">
               <span className="font-bold text-emerald-300 block mb-0.5">Foco de Atuação</span>
-              <span className="text-slate-400">Prospecção direcionada regional combinada a rituais de renovação de contratos Corporate estruturada.</span>
+              <span className="text-slate-400">defesa da base, gestão eficiente de renovações contratuais e busca por novos mercados mercados (CNPJs).</span>
             </div>
           </div>
 
@@ -811,107 +738,6 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
               </div>
             </div>
           </div>
-
-          {/* Dinâmicos Calculators / Simulators */}
-          <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-6">
-            <h3 className="text-md font-black text-white uppercase tracking-tight pb-3 border-b border-white/5 flex items-center gap-1.5 mb-4">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              Simulador de Conversão Agro / Corp
-            </h3>
-
-            <div className="space-y-4 text-xs font-medium">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Novos CNPJs Meta</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <input
-                      type="number"
-                      value={agroTargetLogos}
-                      onChange={(e) => setAgroTargetLogos(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">CNPJs Fechados</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <input
-                      type="number"
-                      value={agroRealizedLogos}
-                      onChange={(e) => setAgroRealizedLogos(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-450 text-slate-405 text-slate-400 block mb-1">Win Rate Atual (%)</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <input
-                      type="number"
-                      value={agroCurrentWinRate}
-                      onChange={(e) => setAgroCurrentWinRate(Math.max(0, parseFloat(e.target.value) || 0))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                    <span className="text-slate-500 font-mono">%</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-slate-450 text-slate-400 block mb-1">Win Rate Meta (%)</label>
-                  <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                    <input
-                      type="number"
-                      value={agroTargetWinRate}
-                      onChange={(e) => setAgroTargetWinRate(Math.max(0, parseFloat(e.target.value) || 0))}
-                      className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                    />
-                    <span className="text-slate-500 font-mono">%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Volume de Pipeline Cadastrado</label>
-                <div className="flex items-center bg-slate-950 p-2 rounded-xl border border-white/10">
-                  <span className="text-slate-500 font-mono mr-2">R$</span>
-                  <input
-                    type="number"
-                    value={agroPipeline}
-                    onChange={(e) => setAgroPipeline(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="bg-transparent text-white font-mono outline-none border-none w-full p-0 font-bold"
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic calculations results */}
-              <div className="bg-slate-950/70 p-4 rounded-xl border border-emerald-500/20 space-y-3 mt-4">
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-slate-400">Progresso Executado:</span>
-                  <span className={cn(
-                    "font-mono font-bold",
-                    closedLogosIsActive ? "text-emerald-400" : "text-yellow-400"
-                  )}>
-                    {((agroRealizedLogos / agroTargetLogos) * 100).toFixed(0)}% concluído
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-2">
-                  <span className="text-slate-400">Impacto Melhora Win Rate:</span>
-                  <span className="text-emerald-400 font-mono font-black">{formatBRL(additionalPotentialLift)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Cobertura Real / Meta:</span>
-                  <span className={cn(
-                    "font-mono font-black px-2 py-0.5 rounded text-[11px]",
-                    agroCoverageRatio >= targetAgroCoverage ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                  )}>
-                    {agroCoverageRatio.toFixed(1)}x / 2.0x
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Structural Initiatives & KPIs */}
@@ -923,7 +749,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
             <div className="space-y-4">
               {[
                 { title: "Motor Ativo de Prospecção Regional", desc: "Análise geográfica de safras e polo de negócios industriais para alimentar o pipeline de vendas de forma territorial pré-programada." },
-                { title: "Trilha Técnica de Capacitação Comercial", desc: "Habilitar nossos gerentes de conta com argumentos competitivos para multiplicar o win rate de novas soluções agro S&OP." },
+                { title: "Canais de Distribuição", desc: "Habilitar representantes comerciais para distribuição de produtos e soluções para nichos específicos de mercado em regiões pré-determinadas." },
                 { title: "Média de Gestão de Renovação Corporate", desc: "Acompanhamento em alto toque das contas corporativas para gerenciar vencimentos futuros com antecedência e mapear riscos." },
                 { title: "Estratégia de Diversificação SaaS", desc: "Disseminar novos produtos de automação de fluxo de vendas nas contas onde o core business atual já está integrado e rodando estavelmente." },
               ].map((ini, i) => (
@@ -947,7 +773,7 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
               {[
                 { kpi: "Nível Rentabilidade (NRR)", desc: "Estabilidade de contas correntes" },
-                { kpi: "Novos Logos (CNPJs)", desc: "Controle trimestral de decolagem" },
+                { kpi: "Expansão da base (Novos CNPJS)", desc: "controle trimestral do volume de novos clientes." },
                 { kpi: "Win Rate de Novos Produtos", desc: "Eficiência de conversão" },
                 { kpi: "Redução de Churn (-30%)", desc: "Proteção da base consolidada" },
                 { kpi: "Gestão de Renovações", desc: "Taxa de renovação no vencimento" },
@@ -1208,12 +1034,12 @@ export default function PlanoVendasVertical({ subView, setSubView }: PlanoVendas
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3">
-              {renderEffortBadgeMini(0, 100)}
+              {renderEffortBadgeMini(80, 20)}
               <h2 className="text-2xl font-black text-white uppercase tracking-tighter">
                 Vertical Low-Touch Comercial
               </h2>
               <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Foco integral em <strong className="text-white">Ataque, Volume e Escala Digital</strong>. Operando de forma 100% automatizada e self-service, este modelo elimina o atrito de vendas manuais, alavancando campanhas digitais e fluxos onboarding otimizados.
+                Foco integral em <strong className="text-white">Escala Digital, Volume e Eficiência</strong>. Operando com calibragem equilibrada (80% Defesa / 20% Ataque), este modelo automatiza a retenção de contas menores enquanto capta novos trials de forma self-service.
               </p>
             </div>
 
