@@ -39,7 +39,9 @@ import {
   Eye,
   EyeOff,
   Home,
-  Network
+  Network,
+  MousePointer,
+  Lock
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -59,6 +61,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { verticalDataService, globalSettingsService } from './services/firebaseService';
 import { auth, signInWithGoogle } from './lib/firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import PlanoVendasVertical from './components/PlanoVendasVertical';
 
 const InfoTooltip = ({ text }: { text: string }) => (
   <span className="group relative inline-block ml-1.5 align-middle">
@@ -328,6 +331,16 @@ export default function App() {
     }
   });
   const [isPlanoAStateSaving, setIsPlanoAStateSaving] = useState(false);
+  const [planoASubView, setPlanoASubView] = useState<'resumo' | 'organograma' | 'financeiro' | 'agro_corp' | 'governo' | 'low_touch'>('resumo');
+  const [isPlanoAUnlocked, setIsPlanoAUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('planoa_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [typedPassword, setTypedPassword] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string>('');
 
   const savePlanoAState = async (newState: Record<string, string>) => {
     setIsPlanoAStateSaving(true);
@@ -2071,6 +2084,92 @@ export default function App() {
 };
 
   const renderPlanoA = () => {
+    if (!isPlanoAUnlocked) {
+      const handlePasswordSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        if (typedPassword === "9451557") {
+          setIsPlanoAUnlocked(true);
+          try {
+            sessionStorage.setItem('planoa_unlocked', 'true');
+          } catch (err) {
+            console.error(err);
+          }
+          setPasswordError('');
+          setTypedPassword('');
+        } else {
+          setPasswordError('Senha incorreta. Por favor, tente novamente.');
+        }
+      };
+
+      return (
+        <div className="flex flex-col items-center justify-center flex-1 min-h-[450px] p-6 text-left">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-gradient-to-br from-slate-900/95 via-slate-950/98 to-slate-900/95 border border-yellow-500/20 rounded-2xl p-8 shadow-2xl relative overflow-hidden"
+          >
+            {/* Background design */}
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-yellow-500/10 rounded-full filter blur-2xl pointer-events-none animate-pulse" />
+            <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-amber-500/5 rounded-full filter blur-2xl pointer-events-none" />
+
+            <div className="flex flex-col items-center text-center space-y-5">
+              <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-2xl shadow-inner shadow-yellow-500/10">
+                <Lock className="w-8 h-8 text-yellow-400" />
+              </div>
+              
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-white uppercase tracking-tighter">
+                  Acesso Restrito
+                </h2>
+                <p className="text-[10px] text-yellow-500 font-extrabold uppercase tracking-widest bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-0.5 rounded-full">
+                  Plano Comercial 3Q2026
+                </p>
+              </div>
+
+              <p className="text-xs text-slate-350 leading-relaxed font-semibold max-w-sm">
+                As informações deste plano de vendas são de uso confidencial. Digite a senha master para desbloquear a visualização de headcounts, simulações por vertical e organograma do 3Q2026.
+              </p>
+
+              <form onSubmit={handlePasswordSubmit} className="w-full space-y-4 pt-2">
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">
+                    Senha de Acesso
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={typedPassword}
+                    onChange={(e) => {
+                      setTypedPassword(e.target.value);
+                      if (passwordError) setPasswordError('');
+                    }}
+                    autoFocus
+                    className="w-full bg-slate-950/85 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono text-center text-white focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/10 transition-all placeholder:text-slate-700"
+                  />
+                  {passwordError && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-[10.5px] font-bold text-rose-450 mt-1"
+                    >
+                      {passwordError}
+                    </motion.p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-450 hover:to-amber-450 text-slate-955 font-black text-xs uppercase tracking-wider py-3.5 px-4 rounded-xl shadow-lg shadow-yellow-500/10 hover:shadow-yellow-500/20 border border-yellow-400/20 transition-all duration-300"
+                >
+                  Acessar o Dashboard
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        </div>
+      );
+    }
+
     // 1. Calculate dynamic defaults
     const defFinLeader = (salesHCState['FINANCEIRO I']?.gr || 0) + (salesHCState['FINANCEIRO II']?.gr || 0);
     const defAgroLeader = salesHCState['AGRO/CORP']?.gr || 0;
@@ -2153,68 +2252,130 @@ export default function App() {
       );
     };
 
+    const headerTitle = 
+      planoASubView === 'resumo' ? "Plano de Vendas por Vertical" :
+      planoASubView === 'organograma' ? "Organograma Comercial — 3Q2026" :
+      planoASubView === 'financeiro' ? "Vertical Financeiro" :
+      planoASubView === 'agro_corp' ? "Vertical Agro / Corp" :
+      planoASubView === 'governo' ? "Vertical Governo" :
+      "Vertical Low-Touch";
+
+    const headerDesc = 
+      planoASubView === 'resumo' ? "Reestruturação e diretrizes do plano comercial por vertical de vendas." :
+      planoASubView === 'organograma' ? "Estrutura comercial com CSM integrado e headcounts de 3Q2026 100% editáveis de forma isolada." :
+      planoASubView === 'financeiro' ? "Blindagem de base madura (70% Defesa) e expansão via novos módulos SaaS (30% Ataque)." :
+      planoASubView === 'agro_corp' ? "Retenção de grandes contas corporate (80% Defesa) e novos logos no Agro (20% Ataque)." :
+      planoASubView === 'governo' ? "Prospecção burocrática de licitações públicas com alta taxa de conversão (35% Defesa / 65% Ataque)." :
+      "Operação automatizada de escala com volume e baixo custo de aquisição (100% Ataque).";
+
     return (
       <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden text-left">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
           <div>
             <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">
-              Organograma — 3Q2026
+              {headerTitle}
             </h1>
             <p className="text-xs text-slate-400 font-semibold leading-relaxed mt-0.5">
-              Estrutura comercial com CSM integrado e headcounts de 3Q2026 100% editáveis de forma isolada.
+              {headerDesc}
             </p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* Reset Button */}
-            <button
-              onClick={() => {
-                if (confirm("Deseja redefinir os headcounts personalizados do 3Q2026 para os valores padrão do restante do aplicativo?")) {
-                  setPlanoAState({});
-                  localStorage.removeItem('planoa_state');
-                  globalSettingsService.saveGlobalSettings({ planoa_state: "" }).catch(console.error);
-                }
-              }}
-              className="flex items-center space-x-1.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold px-3 py-2 rounded-xl border border-white/5 transition-all"
-              title="Restaurar de acordes com as outras páginas"
-            >
-              <Undo className="w-3.5 h-3.5" />
-              <span>Limpar Ajustes</span>
-            </button>
+            {planoASubView === 'organograma' ? (
+              <>
+                {/* Reset Button */}
+                <button
+                  onClick={() => {
+                    if (confirm("Deseja redefinir os headcounts personalizados do 3Q2026 para os valores padrão do restante do aplicativo?")) {
+                      setPlanoAState({});
+                      localStorage.removeItem('planoa_state');
+                      globalSettingsService.saveGlobalSettings({ planoa_state: "" }).catch(console.error);
+                    }
+                  }}
+                  className="flex items-center space-x-1.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold px-3 py-2 rounded-xl border border-white/5 transition-all"
+                  title="Restaurar de acordes com as outras páginas"
+                >
+                  <Undo className="w-3.5 h-3.5" />
+                  <span>Limpar Ajustes</span>
+                </button>
 
-            {/* Save Button */}
-            <button
-              onClick={() => savePlanoAState(planoAState)}
-              disabled={isPlanoAStateSaving}
-              className={cn(
-                "flex items-center space-x-2 text-xs font-black uppercase tracking-tight px-4 py-2 rounded-xl border transition-all duration-300",
-                hasUnsavedChanges
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]"
-                  : "bg-gradient-to-r from-yellow-500 to-amber-500 text-white border-white/10 shadow-lg hover:opacity-90"
-              )}
-            >
-              {isPlanoAStateSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Salvando...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>{hasUnsavedChanges ? "Salvar Alterações *" : "Salvar 3Q2026"}</span>
-                </>
-              )}
-            </button>
+                {/* Save Button */}
+                <button
+                  onClick={() => savePlanoAState(planoAState)}
+                  disabled={isPlanoAStateSaving}
+                  className={cn(
+                    "flex items-center space-x-2 text-xs font-black uppercase tracking-tight px-4 py-2 rounded-xl border transition-all duration-300",
+                    hasUnsavedChanges
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]"
+                      : "bg-gradient-to-r from-yellow-500 to-amber-500 text-white border-white/10 shadow-lg hover:opacity-90"
+                  )}
+                >
+                  {isPlanoAStateSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>{hasUnsavedChanges ? "Salvar Alterações *" : "Salvar 3Q2026"}</span>
+                    </>
+                  )}
+                </button>
 
-            {/* Total Headcount display */}
-            <div className="flex items-center space-x-2 bg-slate-900 border border-white/10 rounded-xl px-4 py-2 shadow-inner">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total:</span>
-              <span className="text-base font-mono font-black text-sky-400">{totalPlanoAHC.toFixed(1)} HC</span>
-            </div>
+                {/* Total Headcount display */}
+                <div className="flex items-center space-x-2 bg-slate-900 border border-white/10 rounded-xl px-4 py-2 shadow-inner">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total:</span>
+                  <span className="text-base font-mono font-black text-sky-400">{totalPlanoAHC.toFixed(1)} HC</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center space-x-2 bg-slate-900 border border-white/10 rounded-xl px-4 py-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-yellow-500">Diretrizes Ativas</span>
+              </div>
+            )}
           </div>
         </header>
 
-        <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-8 overflow-auto custom-scrollbar relative scroll-smooth">
+        {/* Dynamic Navigation Sub-Tabs bar inside 3Q2026 view */}
+        <div className="flex items-center space-x-1 bg-slate-900/60 p-1 rounded-2xl border border-white/5 shadow-lg shrink-0 max-w-fit overflow-x-auto custom-scrollbar">
+          {[
+            { id: 'resumo', label: 'Resumo Executivo', icon: Briefcase, color: 'text-amber-400' },
+            { id: 'organograma', label: 'Organograma 3Q', icon: Network, color: 'text-sky-400' },
+            { id: 'financeiro', label: 'Financeiro', icon: ShieldCheck, color: 'text-indigo-400' },
+            { id: 'agro_corp', label: 'Agro / Corp', icon: Globe, color: 'text-emerald-400' },
+            { id: 'governo', label: 'Governo', icon: Zap, color: 'text-rose-400' },
+            { id: 'low_touch', label: 'Low-Touch', icon: MousePointer, color: 'text-fuchsia-400' },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = planoASubView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setPlanoASubView(tab.id as any)}
+                className={cn(
+                  "flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-tight transition-all relative whitespace-nowrap",
+                  isActive 
+                    ? "text-white shadow-md shadow-black/20" 
+                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                )}
+              >
+                {isActive && (
+                  <motion.div 
+                    layoutId="planoASubTabActiveBg"
+                    className="absolute inset-0 bg-white/10 rounded-xl"
+                    transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+                  />
+                )}
+                <Icon className={cn("w-4 h-4 shrink-0 z-10", tab.color)} />
+                <span className="z-10">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {planoASubView === 'organograma' ? (
+          <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-8 overflow-auto custom-scrollbar relative scroll-smooth">
           
           {/* Main Relative Container for background visual lines */}
           <div className="min-w-[1360px] flex flex-col items-center space-y-12 relative p-4 pb-12">
@@ -2445,6 +2606,11 @@ export default function App() {
 
           </div>
         </div>
+        ) : (
+          <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-8 overflow-auto custom-scrollbar relative">
+            <PlanoVendasVertical subView={planoASubView} setSubView={setPlanoASubView} />
+          </div>
+        )}
       </div>
     );
   };
