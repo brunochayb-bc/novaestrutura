@@ -157,6 +157,7 @@ export const globalSettingsService = {
           promoted_low_touch?: string;
           sales_hc_state?: string;
           cs_indicators?: string;
+          planoa_state?: string;
         };
       }
       return null;
@@ -176,6 +177,10 @@ export const globalSettingsService = {
     promoted_low_touch?: string;
     sales_hc_state?: string;
     cs_indicators?: string;
+    planoa_hc_helpdesk?: string;
+    planoa_hc_sdr_bdr?: string;
+    planoa_hc_atendimento_leader?: string;
+    planoa_state?: string;
   }) {
     const path = 'settings/global';
     try {

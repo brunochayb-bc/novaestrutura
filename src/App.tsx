@@ -7,6 +7,7 @@ import {
   Target, 
   ChevronRight, 
   BarChart3, 
+  Star, 
   PieChart as PieIcon,
   Filter,
   Monitor,
@@ -37,7 +38,8 @@ import {
   Scale,
   Eye,
   EyeOff,
-  Home
+  Home,
+  Network
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -90,7 +92,7 @@ interface CSIndicator {
   realized: number;
 }
 
-type View = 'premissas' | 'dashboard' | 'estrutura_ideal' | 'operational' | 'executivos' | 'low_touch' | 'organograma' | 'tres_papeis' | 'performance_cs';
+type View = 'premissas' | 'dashboard' | 'estrutura_ideal' | 'operational' | 'executivos' | 'low_touch' | 'organograma' | 'tres_papeis' | 'performance_cs' | 'plano_a';
 
 export default function App() {
   const data = useMemo(() => getDashboardData(), []);
@@ -248,6 +250,98 @@ export default function App() {
       setTimeout(() => {
         setIsHcLowTouchAtualSaving(false);
       }, 1000);
+    }
+  };
+
+  const [planoAHcHelpDesk, setPlanoAHcHelpDesk] = useState<string>(() => {
+    return localStorage.getItem('planoa_hc_helpdesk') || '3.0';
+  });
+  const [isPlanoAHcHelpDeskSaving, setIsPlanoAHcHelpDeskSaving] = useState(false);
+
+  const [planoAHcSdrBdr, setPlanoAHcSdrBdr] = useState<string>(() => {
+    return localStorage.getItem('planoa_hc_sdr_bdr') || '4.0';
+  });
+  const [isPlanoAHcSdrBdrSaving, setIsPlanoAHcSdrBdrSaving] = useState(false);
+
+  const [planoAHcAtendimentoLeader, setPlanoAHcAtendimentoLeader] = useState<string>(() => {
+    return localStorage.getItem('planoa_hc_atendimento_leader') || '1.0';
+  });
+  const [isPlanoAHcAtendimentoLeaderSaving, setIsPlanoAHcAtendimentoLeaderSaving] = useState(false);
+
+  const savePlanoAHcHelpDesk = async (val?: string) => {
+    const targetVal = val !== undefined ? val : planoAHcHelpDesk;
+    setIsPlanoAHcHelpDeskSaving(true);
+    localStorage.setItem('planoa_hc_helpdesk', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ planoa_hc_helpdesk: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving planoa_hc_helpdesk to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsPlanoAHcHelpDeskSaving(false);
+      }, 1000);
+    }
+  };
+
+  const savePlanoAHcSdrBdr = async (val?: string) => {
+    const targetVal = val !== undefined ? val : planoAHcSdrBdr;
+    setIsPlanoAHcSdrBdrSaving(true);
+    localStorage.setItem('planoa_hc_sdr_bdr', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ planoa_hc_sdr_bdr: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving planoa_hc_sdr_bdr to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsPlanoAHcSdrBdrSaving(false);
+      }, 1000);
+    }
+  };
+
+  const savePlanoAHcAtendimentoLeader = async (val?: string) => {
+    const targetVal = val !== undefined ? val : planoAHcAtendimentoLeader;
+    setIsPlanoAHcAtendimentoLeaderSaving(true);
+    localStorage.setItem('planoa_hc_atendimento_leader', targetVal);
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ planoa_hc_atendimento_leader: targetVal });
+      }
+    } catch (err) {
+      console.error('Error saving planoa_hc_atendimento_leader to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsPlanoAHcAtendimentoLeaderSaving(false);
+      }, 1000);
+    }
+  };
+
+  const [planoAState, setPlanoAState] = useState<Record<string, string>>(() => {
+    try {
+      const stored = localStorage.getItem('planoa_state');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isPlanoAStateSaving, setIsPlanoAStateSaving] = useState(false);
+
+  const savePlanoAState = async (newState: Record<string, string>) => {
+    setIsPlanoAStateSaving(true);
+    localStorage.setItem('planoa_state', JSON.stringify(newState));
+    try {
+      if (user) {
+        await globalSettingsService.saveGlobalSettings({ planoa_state: JSON.stringify(newState) });
+      }
+    } catch (err) {
+      console.error('Error saving planoa_state to Firestore:', err);
+    } finally {
+      setTimeout(() => {
+        setIsPlanoAStateSaving(false);
+      }, 800);
     }
   };
 
@@ -581,6 +675,49 @@ export default function App() {
               }
             } catch (e) {
               console.error('Failed to parse cs_indicators:', e);
+            }
+          }
+          if (gSettings.planoa_hc_helpdesk !== undefined) {
+            setPlanoAHcHelpDesk((prev) => {
+              if (prev !== gSettings.planoa_hc_helpdesk) {
+                localStorage.setItem('planoa_hc_helpdesk', gSettings.planoa_hc_helpdesk);
+                return gSettings.planoa_hc_helpdesk;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.planoa_hc_sdr_bdr !== undefined) {
+            setPlanoAHcSdrBdr((prev) => {
+              if (prev !== gSettings.planoa_hc_sdr_bdr) {
+                localStorage.setItem('planoa_hc_sdr_bdr', gSettings.planoa_hc_sdr_bdr);
+                return gSettings.planoa_hc_sdr_bdr;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.planoa_hc_atendimento_leader !== undefined) {
+            setPlanoAHcAtendimentoLeader((prev) => {
+              if (prev !== gSettings.planoa_hc_atendimento_leader) {
+                localStorage.setItem('planoa_hc_atendimento_leader', gSettings.planoa_hc_atendimento_leader);
+                return gSettings.planoa_hc_atendimento_leader;
+              }
+              return prev;
+            });
+          }
+          if (gSettings.planoa_state !== undefined) {
+            try {
+              const parsed = JSON.parse(gSettings.planoa_state);
+              if (parsed && typeof parsed === 'object') {
+                setPlanoAState((prev) => {
+                  if (JSON.stringify(prev) !== JSON.stringify(parsed)) {
+                    localStorage.setItem('planoa_state', gSettings.planoa_state);
+                    return parsed;
+                  }
+                  return prev;
+                });
+              }
+            } catch (e) {
+              console.error('Failed to parse planoa_state:', e);
             }
           }
         }
@@ -1932,6 +2069,385 @@ export default function App() {
     </div>
   );
 };
+
+  const renderPlanoA = () => {
+    // 1. Calculate dynamic defaults
+    const defFinLeader = (salesHCState['FINANCEIRO I']?.gr || 0) + (salesHCState['FINANCEIRO II']?.gr || 0);
+    const defAgroLeader = salesHCState['AGRO/CORP']?.gr || 0;
+    const defGovLeader = salesHCState['GOVERNO']?.gr || 0;
+    const defAtendLeader = 1.0;
+    
+    const defFinEV = (salesHCState['FINANCEIRO I']?.ev || 0) + (salesHCState['FINANCEIRO II']?.ev || 0);
+    const defFinGC = (salesHCState['FINANCEIRO I']?.gc || 0) + (salesHCState['FINANCEIRO II']?.gc || 0);
+    
+    const defAgroEV = salesHCState['AGRO/CORP']?.ev || 0;
+    const defAgroGC = salesHCState['AGRO/CORP']?.gc || 0;
+    
+    const defGovEV = salesHCState['GOVERNO']?.ev || 0;
+    const defGovGC = salesHCState['GOVERNO']?.gc || 0;
+    
+    const defCs = opStatsSummary.totalHC;
+    const defHelpdesk = 3.0;
+    const defSdrbdr = 4.0;
+
+    // Helper to get active headcount
+    const getVal = (key: string, def: number): number => {
+      const valStr = planoAState[key];
+      if (valStr === undefined || valStr === '') return def;
+      const parsed = parseFloat(valStr);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    // Current headcount values
+    const currentDirector = getVal('director', 1.0);
+    const currentFinLeader = getVal('finLeader', defFinLeader);
+    const currentFinEV = getVal('finEV', defFinEV);
+    const currentFinGC = getVal('finGC', defFinGC);
+    const currentAgroLeader = getVal('agroLeader', defAgroLeader);
+    const currentAgroEV = getVal('agroEV', defAgroEV);
+    const currentAgroGC = getVal('agroGC', defAgroGC);
+    const currentGovLeader = getVal('govLeader', defGovLeader);
+    const currentGovEV = getVal('govEV', defGovEV);
+    const currentGovGC = getVal('govGC', defGovGC);
+    const currentAtendLeader = getVal('atendLeader', defAtendLeader);
+    const currentCs = getVal('cs', defCs);
+    const currentHelpdesk = getVal('helpdesk', defHelpdesk);
+    const currentSdrbdr = getVal('sdrbdr', defSdrbdr);
+
+    const totalPlanoAHC = 
+      currentDirector +
+      currentFinLeader + currentFinEV + currentFinGC +
+      currentAgroLeader + currentAgroEV + currentAgroGC +
+      currentGovLeader + currentGovEV + currentGovGC +
+      currentAtendLeader + currentCs + currentHelpdesk + currentSdrbdr;
+
+    const savedStateStr = localStorage.getItem('planoa_state') || '{}';
+    const hasUnsavedChanges = JSON.stringify(planoAState) !== savedStateStr;
+
+    const handleValueChange = (key: string, value: string) => {
+      const nextState = {
+        ...planoAState,
+        [key]: value
+      };
+      setPlanoAState(nextState);
+    };
+
+    // Helper render editable headcount input inside boxes
+    const renderEditableHC = (key: string, defVal: number, textColorClass: string = "text-sky-450") => {
+      const valStr = planoAState[key] !== undefined ? planoAState[key] : defVal.toFixed(1);
+      return (
+        <div className="flex items-center justify-center space-x-1 mt-1.5 mx-auto bg-slate-950/60 rounded px-2 py-0.5 border border-white/5 focus-within:border-sky-400/30 transition-all w-20">
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={valStr}
+            onChange={(e) => handleValueChange(key, e.target.value)}
+            className={cn(
+              "w-10 text-center bg-transparent font-mono text-[11px] font-black outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+              textColorClass
+            )}
+          />
+          <span className="text-[9px] text-slate-500 font-bold uppercase">HC</span>
+        </div>
+      );
+    };
+
+    return (
+      <div className="flex flex-col flex-1 space-y-4 min-h-0 overflow-hidden text-left">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 shrink-0 shadow-2xl">
+          <div>
+            <h1 className="text-2xl font-black uppercase tracking-tighter bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">
+              Organograma — 3Q2026
+            </h1>
+            <p className="text-xs text-slate-400 font-semibold leading-relaxed mt-0.5">
+              Estrutura comercial com CSM integrado e headcounts de 3Q2026 100% editáveis de forma isolada.
+            </p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Reset Button */}
+            <button
+              onClick={() => {
+                if (confirm("Deseja redefinir os headcounts personalizados do 3Q2026 para os valores padrão do restante do aplicativo?")) {
+                  setPlanoAState({});
+                  localStorage.removeItem('planoa_state');
+                  globalSettingsService.saveGlobalSettings({ planoa_state: "" }).catch(console.error);
+                }
+              }}
+              className="flex items-center space-x-1.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold px-3 py-2 rounded-xl border border-white/5 transition-all"
+              title="Restaurar de acordes com as outras páginas"
+            >
+              <Undo className="w-3.5 h-3.5" />
+              <span>Limpar Ajustes</span>
+            </button>
+
+            {/* Save Button */}
+            <button
+              onClick={() => savePlanoAState(planoAState)}
+              disabled={isPlanoAStateSaving}
+              className={cn(
+                "flex items-center space-x-2 text-xs font-black uppercase tracking-tight px-4 py-2 rounded-xl border transition-all duration-300",
+                hasUnsavedChanges
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]"
+                  : "bg-gradient-to-r from-yellow-500 to-amber-500 text-white border-white/10 shadow-lg hover:opacity-90"
+              )}
+            >
+              {isPlanoAStateSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Salvando...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>{hasUnsavedChanges ? "Salvar Alterações *" : "Salvar 3Q2026"}</span>
+                </>
+              )}
+            </button>
+
+            {/* Total Headcount display */}
+            <div className="flex items-center space-x-2 bg-slate-900 border border-white/10 rounded-xl px-4 py-2 shadow-inner">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total:</span>
+              <span className="text-base font-mono font-black text-sky-400">{totalPlanoAHC.toFixed(1)} HC</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 bg-slate-950/40 border border-white/5 rounded-3xl p-4 md:p-8 overflow-auto custom-scrollbar relative scroll-smooth">
+          
+          {/* Main Relative Container for background visual lines */}
+          <div className="min-w-[1360px] flex flex-col items-center space-y-12 relative p-4 pb-12">
+
+            {/* Level 0: Diretoria Comercial */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative z-10"
+            >
+              <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-sky-500 p-[2px] rounded-2xl shadow-[0_0_40px_-5px_rgba(99,102,241,0.35)]">
+                <div className="bg-slate-950 rounded-[14px] px-14 py-5 border border-white/10 text-center min-w-[260px]">
+                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1 font-mono">C-Level Direção</p>
+                  <h3 className="text-lg font-black text-white uppercase tracking-tight">Diretoria Comercial</h3>
+                  {renderEditableHC('director', 1.0, "text-sky-400")}
+                </div>
+              </div>
+              {/* Stem down to the horizontal line */}
+              <div className="absolute left-1/2 bottom-0 w-px h-12 bg-white/20 -translate-x-1/2 translate-y-full" />
+            </motion.div>
+
+            {/* Horizontal level connector row */}
+            <div className="relative w-full z-10">
+              <div className="flex flex-row space-x-6 items-start justify-center relative pt-12">
+                {/* Centered vertical connector from Director downwards into horizontal plane */}
+                <div className="absolute top-0 left-1/2 w-px h-12 bg-white/20 -translate-x-1/2" />
+                
+                {/* COLUMN 1: FINANCEIRO */}
+                <div className="w-[220px] shrink-0 flex flex-col items-center relative">
+                  {/* Segment of horizontal tree line */}
+                  <div className="absolute top-0 left-1/2 right-[-12px] h-px bg-white/20" />
+                  {/* Vertical stem down to the card */}
+                  <div className="w-px h-6 bg-white/20" />
+
+                  {/* Leader Box */}
+                  <div className="w-full h-[110px] bg-slate-900 border border-indigo-500/20 rounded-2xl p-4 text-center relative hover:border-indigo-500/40 transition-all flex flex-col justify-center">
+                    <h4 className="text-sm font-black text-white uppercase truncate">Financeiro</h4>
+                    {renderEditableHC('finLeader', defFinLeader, "text-indigo-400")}
+                    
+                    {/* Stem down to EV */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  {/* Vertically separate layout */}
+                  <div className="h-10 shrink-0" />
+
+                  {/* EV Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-indigo-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Ataque" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded border border-red-500/20 shadow-sm">Ataque</span>
+                    <Briefcase className="w-4 h-4 mx-auto mb-1 text-indigo-400 opacity-80" />
+                    <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivos de Vendas</p>
+                    {renderEditableHC('finEV', defFinEV, "text-indigo-400")}
+
+                    {/* Stem down to GC */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  <div className="h-10 shrink-0" />
+
+                  {/* GC Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-indigo-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Defesa" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shadow-sm">Defesa</span>
+                    <Users className="w-4 h-4 mx-auto mb-1 text-indigo-400 opacity-80" />
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerentes de Contas</p>
+                    {renderEditableHC('finGC', defFinGC, "text-indigo-400")}
+                  </div>
+                </div>
+
+
+                {/* COLUMN 2: AGRO/CORP */}
+                <div className="w-[220px] shrink-0 flex flex-col items-center relative">
+                  {/* Segment of horizontal tree line */}
+                  <div className="absolute top-0 left-[-12px] right-[-12px] h-px bg-white/20" />
+                  {/* Vertical stem down to the card */}
+                  <div className="w-px h-6 bg-white/20" />
+
+                  {/* Leader Box */}
+                  <div className="w-full h-[110px] bg-slate-900 border border-rose-500/20 rounded-2xl p-4 text-center relative hover:border-rose-500/40 transition-all flex flex-col justify-center">
+                    <h4 className="text-sm font-black text-white uppercase truncate">Agro/Corp</h4>
+                    {renderEditableHC('agroLeader', defAgroLeader, "text-rose-400")}
+                    
+                    {/* Stem down to EV */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  {/* Spacer */}
+                  <div className="h-10 shrink-0" />
+
+                  {/* EV Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-rose-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Ataque" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded border border-red-500/20 shadow-sm">Ataque</span>
+                    <Briefcase className="w-4 h-4 mx-auto mb-1 text-rose-400 opacity-80" />
+                    <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivos de Vendas</p>
+                    {renderEditableHC('agroEV', defAgroEV, "text-rose-400")}
+
+                    {/* Stem down to GC */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  <div className="h-10 shrink-0" />
+
+                  {/* GC Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-rose-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Defesa" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shadow-sm">Defesa</span>
+                    <Users className="w-4 h-4 mx-auto mb-1 text-rose-400 opacity-80" />
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerentes de Contas</p>
+                    {renderEditableHC('agroGC', defAgroGC, "text-rose-400")}
+                  </div>
+                </div>
+
+
+                {/* COLUMN 3: GOVERNO */}
+                <div className="w-[220px] shrink-0 flex flex-col items-center relative">
+                  {/* Segment of horizontal tree line */}
+                  <div className="absolute top-0 left-[-12px] right-[-12px] h-px bg-white/20" />
+                  {/* Vertical stem down to the card */}
+                  <div className="w-px h-6 bg-white/20" />
+
+                  {/* Leader Box */}
+                  <div className="w-full h-[110px] bg-slate-900 border border-amber-500/20 rounded-2xl p-4 text-center relative hover:border-amber-500/40 transition-all flex flex-col justify-center">
+                    <h4 className="text-sm font-black text-white uppercase truncate">Governo</h4>
+                    {renderEditableHC('govLeader', defGovLeader, "text-amber-400")}
+                    
+                    {/* Stem down to EV */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  {/* Spacer */}
+                  <div className="h-10 shrink-0" />
+
+                  {/* EV Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-amber-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Ataque" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded border border-red-500/20 shadow-sm">Ataque</span>
+                    <Briefcase className="w-4 h-4 mx-auto mb-1 text-amber-400 opacity-80" />
+                    <p className="text-[10px] font-black text-white uppercase tracking-tighter">Executivos de Vendas</p>
+                    {renderEditableHC('govEV', defGovEV, "text-amber-400")}
+
+                    {/* Stem down to GC */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  <div className="h-10 shrink-0" />
+
+                  {/* GC Box */}
+                  <div className="w-full h-[120px] bg-slate-900/90 hover:bg-slate-900 border border-amber-500/20 rounded-2xl p-4 text-center flex flex-col justify-center relative transition-all duration-300">
+                    {/* Tag "Defesa" */}
+                    <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shadow-sm">Defesa</span>
+                    <Users className="w-4 h-4 mx-auto mb-1 text-amber-400 opacity-80" />
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Gerentes de Contas</p>
+                    {renderEditableHC('govGC', defGovGC, "text-amber-400")}
+                  </div>
+                </div>
+
+
+                {/* COLUMN 4: CUSTOMER SUCCESS MANAGEMENT (THREE SUBCOLUMNS SIDE-BY-SIDE!) */}
+                <div className="w-[680px] shrink-0 flex flex-col items-center relative">
+                  {/* Segment of horizontal tree line */}
+                  <div className="absolute top-0 left-[-12px] right-1/2 h-px bg-white/20" />
+                  {/* Vertical stem down to the leader card */}
+                  <div className="w-px h-6 bg-white/20" />
+
+                  {/* CSM Leader Card (Centered above the 3 subcolumns) */}
+                  <div className="w-[220px] h-[110px] bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 text-center relative hover:border-emerald-500/40 transition-all flex flex-col justify-center">
+                    <h4 className="text-sm font-black text-white uppercase truncate">CSM</h4>
+                    {renderEditableHC('atendLeader', defAtendLeader, "text-emerald-400")}
+                    
+                    {/* Stem down to the horizontal branching bar */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-10 bg-white/20 -translate-x-1/2 translate-y-full" />
+                  </div>
+
+                  {/* Spacer representing branching bar area */}
+                  <div className="h-10 w-full relative flex items-center justify-center shrink-0">
+                    {/* Stem coming down from Leader */}
+                    <div className="absolute left-1/2 top-0 w-px h-5 bg-white/20 -translate-x-1/2" />
+
+                    {/* Horizontal bar stretching from center of CS card to center of Low-Touch card */}
+                    <div className="absolute top-1/2 left-[105px] right-[105px] h-px bg-white/20 -translate-y-1/2" />
+                    
+                    {/* Vertical stem down to center column (Help Desk) */}
+                    <div className="absolute left-1/2 bottom-0 w-px h-5 bg-white/20 -translate-x-1/2" />
+                    
+                    {/* Vertical stems down for outer columns (CS and Low-Touch) */}
+                    <div className="absolute left-[105px] bottom-0 w-px h-5 bg-white/20 -translate-x-1/2" />
+                    <div className="absolute right-[105px] bottom-0 w-px h-5 bg-white/20 -translate-x-1/2" />
+                  </div>
+
+                  {/* Row of 3 subcolumns side-by-side (same high hierarchical level as EVs!) */}
+                  <div className="grid grid-cols-3 gap-6 w-full">
+                    
+                    {/* SUBCOLUMN 1: Customer Success (Closest side to sales!) */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-full h-[120px] bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 text-center flex flex-col justify-center hover:border-emerald-500/40 transition-all">
+                        <ShieldCheck className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
+                        <p className="text-[10px] font-black text-white uppercase tracking-tighter">Customer Success</p>
+                        {renderEditableHC('cs', defCs, "text-emerald-400")}
+                      </div>
+                    </div>
+
+                    {/* SUBCOLUMN 2: Help Desk */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-full h-[120px] bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 text-center flex flex-col justify-center hover:border-emerald-500/40 transition-all">
+                        <Monitor className="w-4 h-4 mx-auto mb-1 text-emerald-400 opacity-80" />
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Help Desk</p>
+                        {renderEditableHC('helpdesk', defHelpdesk, "text-emerald-400")}
+                      </div>
+                    </div>
+
+                    {/* SUBCOLUMN 3: Low-Touch */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-full h-[120px] bg-slate-900 border border-emerald-500/20 rounded-2xl p-4 text-center flex flex-col justify-center hover:border-emerald-500/40 transition-all">
+                        <Target className="w-4 h-4 mx-auto mb-1 text-emerald-400 opacity-80" />
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">Low-Touch</p>
+                        {renderEditableHC('sdrbdr', defSdrbdr, "text-emerald-400")}
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderTresPapeis = () => (
     <div className="flex flex-col flex-1 space-y-6 min-h-0 overflow-hidden">
@@ -4752,6 +5268,41 @@ export default function App() {
                 />
               )}
             </button>
+
+            {/* 3Q2026 (Highlights in Yellow, Starred, Last Item) */}
+            <button
+              onClick={() => setCurrentView('plano_a')}
+              className={cn(
+                "w-full flex items-center px-4 py-3 rounded-xl transition-all duration-300 group relative border",
+                currentView === 'plano_a'
+                  ? "text-yellow-300 bg-yellow-500/15 border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]"
+                  : "text-yellow-500/80 bg-yellow-500/5 border-yellow-500/15 hover:text-yellow-300 hover:bg-yellow-500/10"
+              )}
+            >
+              {currentView === 'plano_a' && (
+                <motion.div 
+                  layoutId="activeNavBg"
+                  className="absolute inset-0 bg-yellow-500/10 rounded-xl"
+                  transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
+                />
+              )}
+              <Star className={cn(
+                "w-5 h-5 mr-4 transition-all duration-300 shrink-0 z-10 fill-yellow-500/20",
+                currentView === 'plano_a' ? "text-yellow-400 scale-110" : "text-yellow-500 group-hover:text-yellow-400"
+              )} />
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-black uppercase tracking-tighter transition-opacity whitespace-nowrap z-10 flex items-center gap-1.5">
+                  3Q2026
+                </span>
+              )}
+              {currentView === 'plano_a' && (
+                <motion.div 
+                  layoutId="activeNavStripe"
+                  className="absolute left-0 w-1 h-6 bg-yellow-400 rounded-r-full z-10"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+            </button>
           </nav>
 
           {/* Sync Status */}
@@ -4867,6 +5418,17 @@ export default function App() {
               className="flex-1 flex flex-col min-h-0"
             >
               {renderOrganograma()}
+            </motion.div>
+          ) : currentView === 'plano_a' ? (
+            <motion.div 
+              key="plano_a"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex-1 flex flex-col min-h-0"
+            >
+              {renderPlanoA()}
             </motion.div>
           ) : currentView === 'tres_papeis' ? (
             <motion.div 
